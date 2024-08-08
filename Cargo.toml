@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 dotenvy = "0.15.7"
+regex = "1.10.6"
+time = { version = "0.3", features = ["macros"] }

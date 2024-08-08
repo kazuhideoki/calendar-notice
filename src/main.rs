@@ -23,6 +23,10 @@ fn main() {
     let events = calendar::Event::get_events(&calendar_name).expect("Failed to get events");
 
     events.iter().for_each(|event| {
-        println!("🔵 {:?}", event.title);
+        println!(
+            "🔵 {:?} 時間:{:?}",
+            event.title,
+            event.start_time.to_string()
+        );
     });
 }
