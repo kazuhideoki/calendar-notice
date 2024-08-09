@@ -1,23 +1,44 @@
+mod oauth_secret;
+
+use rand::{distributions::Alphanumeric, Rng};
 use std::{
     collections::HashMap,
     sync::{mpsc, Mutex, OnceLock},
 };
-
-use oauth_secret::OAuthSecret;
-use rand::{distributions::Alphanumeric, Rng};
 use tokio::runtime::Runtime;
+use warp::Filter;
 
-mod oauth_secret;
+use crate::oauth::oauth_secret::OAuthSecret;
 
-pub const BASE_PATH: &str = "http://localhost:8990";
-pub const AUTH_REDIRECT: &str = "auth";
+const PORT: u16 = 8990;
+const BASE_URL: &str = "http://localhost";
+const AUTH_REDIRECT_PATH: &str = "auth";
 
 fn authentication_code() -> &'static std::sync::Mutex<String> {
     static AUTHENTICATION_CODE: OnceLock<Mutex<String>> = OnceLock::new();
     AUTHENTICATION_CODE.get_or_init(|| Mutex::new("".to_string()))
 }
 
-pub fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> String {
+pub fn to_oauth_on_browser() {
+    let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string");
+
+    open::that(oauth_url).expect("Failed to open URL in browser");
+}
+
+pub fn run_redirect_server() {
+    // HTTPサーバーを起動
+    tokio::spawn(async {
+        let routes = warp::path(AUTH_REDIRECT_PATH)
+            .and(warp::query::<std::collections::HashMap<String, String>>())
+            .map(handle_oauth_redirect);
+
+        println!("HTTP server starting at {}", PORT);
+        warp::serve(routes).run(([127, 0, 0, 1], PORT)).await;
+    });
+}
+
+// TODO リクエスト部分を Result にして整理
+fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> String {
     if !authentication_code().lock().unwrap().is_empty() {
         return "Completed".to_string();
     }
@@ -35,8 +56,6 @@ pub fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) 
 
         let rt = Runtime::new().unwrap();
         rt.spawn(async move {
-            println!("Requesting access token...");
-
             // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
             let mut body = HashMap::new();
             body.insert("code", code);
@@ -46,7 +65,7 @@ pub fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) 
             body.insert("code_challenge", generate_code_challenge());
             body.insert(
                 "redirect_uri",
-                format!("{}/{}", BASE_PATH, AUTH_REDIRECT).to_string(),
+                format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
             );
 
             let client = reqwest::Client::new();
