@@ -11,7 +11,7 @@ use crate::{oauth::oauth_secret::OAuthSecret, repository::oauth_state};
 #[derive(Debug, Serialize, Deserialize)]
 
 pub struct OAuthResponse {
-    access_token: String,
+    pub access_token: String,
     expires_in: u64,
     refresh_token: String,
     scope: String,
