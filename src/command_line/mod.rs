@@ -1,13 +1,14 @@
+#![allow(unused_variables)]
 use clap::Parser;
 use std::io::{self, BufRead};
+
+use crate::repository::oauth_state;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_flag = true)]
 struct Args {
     #[arg(short, long)]
-    connection: Option<String>,
-    #[arg(short, long)]
-    help: bool,
+    test: Option<String>,
 }
 
 pub fn wait_for_command() {
@@ -23,6 +24,11 @@ pub fn wait_for_command() {
                 }
                 println!("受け取ったコマンド: {}", input);
                 // ここでコマンドを処理する
+
+                match input.as_str() {
+                    "token" => println!("{:?}", oauth_state().lock().unwrap()),
+                    _ => {}
+                }
             }
             Err(e) => eprintln!("エラー: {}", e),
         }

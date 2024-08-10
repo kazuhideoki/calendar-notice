@@ -1,23 +1,26 @@
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
-use std::{
-    collections::HashMap,
-    sync::{mpsc, Mutex, OnceLock},
-};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::mpsc};
 use tokio::runtime::Runtime;
 use warp::Filter;
 
-use crate::oauth::oauth_secret::OAuthSecret;
+use crate::{oauth::oauth_secret::OAuthSecret, repository::oauth_state};
+
+#[derive(Debug, Serialize, Deserialize)]
+
+pub struct OAuthResponse {
+    access_token: String,
+    expires_in: u64,
+    refresh_token: String,
+    scope: String,
+    token_type: String,
+}
 
 const PORT: u16 = 8990;
 const BASE_URL: &str = "http://localhost";
 const AUTH_REDIRECT_PATH: &str = "auth";
-
-fn authentication_code() -> &'static std::sync::Mutex<String> {
-    static AUTHENTICATION_CODE: OnceLock<Mutex<String>> = OnceLock::new();
-    AUTHENTICATION_CODE.get_or_init(|| Mutex::new("".to_string()))
-}
 
 pub fn to_oauth_on_browser() {
     let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string");
@@ -39,9 +42,10 @@ pub fn run_redirect_server() {
 
 // TODO リクエスト部分を Result にして整理
 fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> String {
-    if !authentication_code().lock().unwrap().is_empty() {
+    if oauth_state().lock().unwrap().is_some() {
         return "Completed".to_string();
     }
+
     // 認証コードを取得時
     if let Some(code) = params.get("code").cloned() {
         let OAuthSecret {
@@ -50,7 +54,6 @@ fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> S
             token_uri,
         } = OAuthSecret::get_from_file("oauth_secret.json")
             .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
-        *authentication_code().lock().unwrap() = code.to_string();
 
         let (tx, rx) = mpsc::channel();
 
@@ -76,18 +79,18 @@ fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> S
             tx.send(result_body).expect("Failed to send result");
         });
 
-        match rx.recv() {
+        match serde_json::from_str::<OAuthResponse>(&rx.recv().expect(
+            "Failed to receive response from OAuth server. Please check the server status.",
+        )) {
             Ok(response) => {
                 println!("🔵Access Token Ok Response: {:?}", response);
+                *oauth_state().lock().unwrap() = response.into();
             }
             Err(e) => {
                 println!("Recv error: {:?}", e.to_string());
             }
         }
 
-        format!("Code!, {}!", *authentication_code().lock().unwrap())
-    } else if let Some(code) = params.get("access_token").cloned() {
-        println!("🔵 Access Token redirected, {}!", &code);
         "Ok handle_oauth_redirect".to_string()
     } else {
         "Code not found".to_string()
