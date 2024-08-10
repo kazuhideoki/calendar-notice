@@ -7,18 +7,17 @@ mod oauth;
 mod repository;
 
 use command_line as cmd;
-use repository::oauth_state;
+use repository::OAuthResponse;
 
 /**
  * TODO
- * - カレンダーを取得する
- * - token を file に永続化
+ * - token を file に永続化 ✅
  * - file に token があればそれを使う
  * - トークンの有効期限が切れたら refresh する
  */
 #[tokio::main]
 async fn main() {
-    if oauth_state().lock().unwrap().is_none() {
+    if OAuthResponse::from_file().is_none() {
         oauth::to_oauth_on_browser();
     }
 

@@ -1,22 +1,11 @@
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::mpsc};
 use tokio::runtime::Runtime;
 use warp::Filter;
 
-use crate::{oauth::oauth_secret::OAuthSecret, repository::oauth_state};
-
-#[derive(Debug, Serialize, Deserialize)]
-
-pub struct OAuthResponse {
-    pub access_token: String,
-    expires_in: u64,
-    refresh_token: String,
-    scope: String,
-    token_type: String,
-}
+use crate::{oauth::oauth_secret::OAuthSecret, repository::OAuthResponse};
 
 const PORT: u16 = 8990;
 const BASE_URL: &str = "http://localhost";
@@ -42,7 +31,7 @@ pub fn run_redirect_server() {
 
 // TODO リクエスト部分を Result にして整理
 fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> String {
-    if oauth_state().lock().unwrap().is_some() {
+    if OAuthResponse::from_file().is_some() {
         return "Completed".to_string();
     }
 
@@ -79,12 +68,10 @@ fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> S
             tx.send(result_body).expect("Failed to send result");
         });
 
-        match serde_json::from_str::<OAuthResponse>(&rx.recv().expect(
-            "Failed to receive response from OAuth server. Please check the server status.",
-        )) {
+        // match serde_json::from_str::<OAuthResponse>(&rx.recv().expect(
+        match OAuthResponse::parse_and_save(&rx.recv().expect("Failed to recv")) {
             Ok(response) => {
                 println!("🔵Access Token Ok Response: {:?}", response);
-                *oauth_state().lock().unwrap() = response.into();
             }
             Err(e) => {
                 println!("Recv error: {:?}", e.to_string());

@@ -2,7 +2,7 @@
 use clap::Parser;
 use std::io::{self, BufRead};
 
-use crate::{google_calendar, repository::oauth_state};
+use crate::{google_calendar, repository::OAuthResponse};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_flag = true)]
@@ -26,7 +26,7 @@ pub async fn wait_for_command() {
                 // ここでコマンドを処理する
 
                 match input.as_str() {
-                    "token" => println!("{:?}", oauth_state().lock().unwrap()),
+                    "token" => println!("{:?}", OAuthResponse::from_file()),
                     "event" => {
                         let events = google_calendar::list_events()
                             .await

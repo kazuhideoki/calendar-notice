@@ -1,7 +1,7 @@
 use chrono::Days;
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
-use crate::repository::oauth_state;
+use crate::repository::OAuthResponse;
 
 use serde::{Deserialize, Serialize};
 
@@ -115,12 +115,12 @@ struct ConferenceSolutionKey {
 
 #[derive(Debug)]
 pub enum Error {
-    Reqwest(reqwest::Error),
+    Reqwest(String),
     Parse(String),
 }
 impl From<reqwest::Error> for Error {
     fn from(e: reqwest::Error) -> Self {
-        Error::Reqwest(e)
+        Error::Reqwest(e.to_string())
     }
 }
 impl From<InvalidHeaderValue> for Error {
@@ -130,6 +130,10 @@ impl From<InvalidHeaderValue> for Error {
 }
 
 pub async fn list_events() -> Result<CalendarEvents, Error> {
+    let access_token = OAuthResponse::from_file()
+        .expect("Failed to get OAuthResponse from file")
+        .access_token;
+
     let url = format!(
         "https://www.googleapis.com/calendar/v3/calendars/{}/events",
         "primary"
@@ -138,10 +142,7 @@ pub async fn list_events() -> Result<CalendarEvents, Error> {
     let mut headers = HeaderMap::new();
     headers.insert(
         "AUTHORIZATION",
-        HeaderValue::from_str(&format!(
-            "Bearer {}",
-            oauth_state().lock().unwrap().as_ref().unwrap().access_token
-        ))?,
+        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
     );
 
     let client = reqwest::Client::new();
