@@ -2,11 +2,12 @@ use std::fs;
 
 use serde::{Deserialize, Serialize};
 
+// やはり、oauth モジュールに OAuthResponse 構造体を移動しましょうか？
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthResponse {
     pub access_token: String,
     pub expires_in: u64,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     scope: String,
     token_type: String,
 }

@@ -1,8 +1,11 @@
 #![allow(unused_variables)]
 use clap::Parser;
+use reqwest::StatusCode;
 use std::io::{self, BufRead};
 
-use crate::{google_calendar, repository::OAuthResponse};
+use crate::{
+    google_calendar, oauth::request_access_token_by_refresh_token, repository::OAuthResponse,
+};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_flag = true)]
@@ -28,18 +31,42 @@ pub async fn wait_for_command() {
                 match input.as_str() {
                     "token" => println!("{:?}", OAuthResponse::from_file()),
                     "event" => {
-                        let events = google_calendar::list_events()
-                            .await
-                            .unwrap_or_else(|e| panic!("Failed to list events :{:?}", e));
+                        let result = google_calendar::list_events().await;
 
-                        println!(
-                            "{:?}",
-                            events
-                                .items
-                                .iter()
-                                .map(|item| &item.summary)
-                                .collect::<Vec<&String>>()
-                        );
+                        match result {
+                            Ok(events) => {
+                                println!(
+                                    "{:?}",
+                                    events
+                                        .items
+                                        .iter()
+                                        .map(|item| &item.summary)
+                                        .collect::<Vec<&String>>()
+                                );
+                            }
+                            Err(google_calendar::Error::Unauthorized) => {
+                                let OAuthResponse { refresh_token, .. } =
+                                    OAuthResponse::from_file()
+                                        .expect("Failed to get OAuthResponse from file");
+                                if refresh_token.is_none() {
+                                    println!("Refresh token is not found");
+                                    continue;
+                                }
+                                let result =
+                                    request_access_token_by_refresh_token(refresh_token.unwrap())
+                                        .await;
+
+                                match OAuthResponse::parse_and_save(&result.unwrap()) {
+                                    Ok(response) => {
+                                        println!("Success to get token! by refresh token");
+                                    }
+                                    Err(e) => {
+                                        println!("Recv error: {:?}", e.to_string());
+                                    }
+                                }
+                            }
+                            Err(e) => eprintln!("エラー: {:?}", e),
+                        }
                     }
                     _ => {}
                 }

@@ -1,6 +1,7 @@
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
+use reqwest::Client;
 use std::collections::HashMap;
 use warp::Filter;
 
@@ -49,34 +50,7 @@ async fn handle_oauth_redirect(
 
     // 認証コードを取得時
     if let Some(code) = params.get("code").cloned() {
-        let OAuthSecret {
-            client_id,
-            client_secret,
-            token_uri,
-        } = OAuthSecret::get_from_file("oauth_secret.json")
-            .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
-
-        // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
-        let mut body = HashMap::new();
-        body.insert("code", code);
-        body.insert("client_id", client_id);
-        body.insert("client_secret", client_secret);
-        body.insert("grant_type", "authorization_code".to_string());
-        body.insert("code_challenge", generate_code_challenge());
-        body.insert(
-            "redirect_uri",
-            format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
-        );
-
-        let client = reqwest::Client::new();
-        let result = client.post(token_uri).form(&body).send().await;
-        let result = match result {
-            Ok(result) => result.text().await,
-            Err(e) => {
-                println!("Failed to get token: {:?}", e);
-                return Ok("Failed to get token".to_string());
-            }
-        };
+        let result = request_access_token_by_redirect(code).await;
 
         match OAuthResponse::parse_and_save(&result.unwrap()) {
             Ok(response) => {
@@ -92,6 +66,67 @@ async fn handle_oauth_redirect(
         // TODO エラー処理
         Ok("Failed to get code".to_string())
     }
+}
+
+async fn request_access_token_by_redirect(code: String) -> Result<String, reqwest::Error> {
+    let OAuthSecret {
+        client_id,
+        client_secret,
+        token_uri,
+    } = OAuthSecret::get_from_file("oauth_secret.json")
+        .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
+
+    // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
+    let mut body = HashMap::new();
+    body.insert("code", code);
+    body.insert("client_id", client_id);
+    body.insert("client_secret", client_secret);
+    body.insert("grant_type", "authorization_code".to_string());
+    body.insert("code_challenge", generate_code_challenge());
+    body.insert(
+        "redirect_uri",
+        format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
+    );
+
+    let client = reqwest::Client::new();
+    let result = client.post(token_uri).form(&body).send().await;
+    let result = match result {
+        Ok(result) => result.text().await,
+        Err(e) => {
+            println!("Failed to get token: {:?}", e);
+            return Ok("Failed to get token".to_string());
+        }
+    };
+
+    result
+}
+pub async fn request_access_token_by_refresh_token(
+    refresh_token: String,
+) -> Result<String, reqwest::Error> {
+    let OAuthSecret {
+        client_id,
+        client_secret,
+        token_uri,
+    } = OAuthSecret::get_from_file("oauth_secret.json")
+        .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
+
+    let mut body = HashMap::new();
+    body.insert("client_id", client_id);
+    body.insert("client_secret", client_secret);
+    body.insert("refresh_token", refresh_token);
+    body.insert("grant_type", "refresh_token".to_string());
+
+    let client = reqwest::Client::new();
+    let result = client.post(token_uri).form(&body).send().await;
+    let result = match result {
+        Ok(result) => result.text().await,
+        Err(e) => {
+            println!("Failed to get token: {:?}", e);
+            return Ok("Failed to get token".to_string());
+        }
+    };
+
+    result
 }
 
 fn generate_code_challenge() -> String {

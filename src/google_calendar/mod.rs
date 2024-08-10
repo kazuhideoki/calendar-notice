@@ -1,5 +1,8 @@
 use chrono::Days;
-use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
+use reqwest::{
+    header::{HeaderMap, HeaderValue, InvalidHeaderValue},
+    Request,
+};
 
 use crate::repository::OAuthResponse;
 
@@ -115,12 +118,13 @@ struct ConferenceSolutionKey {
 
 #[derive(Debug)]
 pub enum Error {
-    Reqwest(String),
+    Reqwest(reqwest::Error),
+    Unauthorized,
     Parse(String),
 }
 impl From<reqwest::Error> for Error {
     fn from(e: reqwest::Error) -> Self {
-        Error::Reqwest(e.to_string())
+        Error::Reqwest(e)
     }
 }
 impl From<InvalidHeaderValue> for Error {
@@ -166,6 +170,10 @@ pub async fn list_events() -> Result<CalendarEvents, Error> {
         ])
         .send()
         .await?;
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        println!("Unauthorized when requesting list events");
+        return Err(Error::Unauthorized);
+    }
 
     let text = response.text().await?;
     let events: CalendarEvents =

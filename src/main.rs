@@ -10,9 +10,11 @@ use command_line as cmd;
 use repository::OAuthResponse;
 
 /**
- * TODO
- * - トークンの有効期限が切れたら refresh する
- */
+* TODO
+* - parse_and_save
+*   - 読み込みと save は分ける
+*   - 保存し直すのは access_token と expires_in だけ
+*/
 #[tokio::main]
 async fn main() {
     if OAuthResponse::from_file().is_none() {
