@@ -11,8 +11,6 @@ use repository::OAuthResponse;
 
 /**
  * TODO
- * - token を file に永続化 ✅
- * - file に token があればそれを使う
  * - トークンの有効期限が切れたら refresh する
  */
 #[tokio::main]

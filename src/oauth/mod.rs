@@ -1,8 +1,7 @@
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
-use std::{collections::HashMap, sync::mpsc};
-use tokio::runtime::Runtime;
+use std::collections::HashMap;
 use warp::Filter;
 
 use crate::{oauth::oauth_secret::OAuthSecret, repository::OAuthResponse};
@@ -11,6 +10,19 @@ const PORT: u16 = 8990;
 const BASE_URL: &str = "http://localhost";
 const AUTH_REDIRECT_PATH: &str = "auth";
 
+use warp::reject::Reject;
+
+#[derive(Debug)]
+struct ReqwestError;
+
+impl Reject for ReqwestError {}
+
+impl From<reqwest::Error> for ReqwestError {
+    fn from(_: reqwest::Error) -> Self {
+        ReqwestError
+    }
+}
+
 pub fn to_oauth_on_browser() {
     let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string");
 
@@ -18,21 +30,21 @@ pub fn to_oauth_on_browser() {
 }
 
 pub fn run_redirect_server() {
-    // HTTPサーバーを起動
     tokio::spawn(async {
         let routes = warp::path(AUTH_REDIRECT_PATH)
             .and(warp::query::<std::collections::HashMap<String, String>>())
-            .map(handle_oauth_redirect);
+            .and_then(handle_oauth_redirect);
 
         println!("HTTP server starting at {}", PORT);
         warp::serve(routes).run(([127, 0, 0, 1], PORT)).await;
     });
 }
 
-// TODO リクエスト部分を Result にして整理
-fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> String {
+async fn handle_oauth_redirect(
+    params: std::collections::HashMap<String, String>,
+) -> Result<impl warp::Reply, warp::Rejection> {
     if OAuthResponse::from_file().is_some() {
-        return "Completed".to_string();
+        return Ok("Completed".to_string());
     }
 
     // 認証コードを取得時
@@ -44,43 +56,41 @@ fn handle_oauth_redirect(params: std::collections::HashMap<String, String>) -> S
         } = OAuthSecret::get_from_file("oauth_secret.json")
             .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
 
-        let (tx, rx) = mpsc::channel();
+        // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
+        let mut body = HashMap::new();
+        body.insert("code", code);
+        body.insert("client_id", client_id);
+        body.insert("client_secret", client_secret);
+        body.insert("grant_type", "authorization_code".to_string());
+        body.insert("code_challenge", generate_code_challenge());
+        body.insert(
+            "redirect_uri",
+            format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
+        );
 
-        let rt = Runtime::new().unwrap();
-        rt.spawn(async move {
-            // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
-            let mut body = HashMap::new();
-            body.insert("code", code);
-            body.insert("client_id", client_id);
-            body.insert("client_secret", client_secret);
-            body.insert("grant_type", "authorization_code".to_string());
-            body.insert("code_challenge", generate_code_challenge());
-            body.insert(
-                "redirect_uri",
-                format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
-            );
+        let client = reqwest::Client::new();
+        let result = client.post(token_uri).form(&body).send().await;
+        let result = match result {
+            Ok(result) => result.text().await,
+            Err(e) => {
+                println!("Failed to get token: {:?}", e);
+                return Ok("Failed to get token".to_string());
+            }
+        };
 
-            let client = reqwest::Client::new();
-            let result = client.post(token_uri).form(&body).send().await;
-
-            let result_body = result.unwrap().text().await.unwrap();
-
-            tx.send(result_body).expect("Failed to send result");
-        });
-
-        // match serde_json::from_str::<OAuthResponse>(&rx.recv().expect(
-        match OAuthResponse::parse_and_save(&rx.recv().expect("Failed to recv")) {
+        match OAuthResponse::parse_and_save(&result.unwrap()) {
             Ok(response) => {
-                println!("🔵Access Token Ok Response: {:?}", response);
+                println!("Success to get token!");
             }
             Err(e) => {
                 println!("Recv error: {:?}", e.to_string());
             }
         }
 
-        "Ok handle_oauth_redirect".to_string()
+        Ok("Ok handle_oauth_redirect".to_string())
     } else {
-        "Code not found".to_string()
+        // TODO エラー処理
+        Ok("Failed to get code".to_string())
     }
 }
 

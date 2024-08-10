@@ -12,11 +12,14 @@ pub struct OAuthResponse {
 }
 impl OAuthResponse {
     pub fn from_file() -> Option<Self> {
-        let file = fs::read_to_string("oauth_token.json").unwrap();
+        let file = fs::read_to_string("oauth_token_response.json").unwrap_or_else(|_| {
+            fs::write("oauth_token_response.json", "{}").unwrap();
+            "".to_string()
+        });
         serde_json::from_str(&file).ok()
     }
     pub fn parse_and_save(data: &str) -> Result<Self, std::io::Error> {
-        fs::write("oauth_token.json", data)?;
+        fs::write("oauth_token_response.json", data)?;
         let oauth_response: OAuthResponse = serde_json::from_str(data)?;
         Ok(oauth_response)
     }

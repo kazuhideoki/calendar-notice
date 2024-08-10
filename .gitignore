@@ -1,4 +1,4 @@
 /target
 .env
 oauth_secret.json
-oauth_token.json
+oauth_token_response.json
