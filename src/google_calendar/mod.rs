@@ -41,8 +41,8 @@ pub struct Event {
     description: Option<String>,
     creator: EventPerson,
     organizer: EventPerson,
-    start: EventDateTime,
-    end: EventDateTime,
+    pub start: EventDateTime,
+    pub end: EventDateTime,
     recurring_event_id: Option<String>,
     original_start_time: Option<EventDateTime>,
     transparency: Option<String>,
@@ -64,9 +64,9 @@ struct EventPerson {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct EventDateTime {
+pub struct EventDateTime {
     #[serde(rename = "dateTime", default)]
-    date_time: Option<String>,
+    pub date_time: Option<String>,
     #[serde(default)]
     date: Option<String>,
     #[serde(rename = "timeZone")]

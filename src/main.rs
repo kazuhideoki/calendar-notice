@@ -12,8 +12,7 @@ use oauth::OAuthResponse;
 
 /**
  TODO
- - cron で定期実行するもの作る
- - 書くイベントの 10分前を過ぎたら通知 -> カレンダーAppを表示
+ -
 */
 #[tokio::main]
 async fn main() {
