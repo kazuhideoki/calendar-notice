@@ -1,17 +1,57 @@
+#![allow(unused_variables)]
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
-use reqwest::Client;
 use std::collections::HashMap;
+use std::fs;
 use warp::Filter;
 
-use crate::{oauth::oauth_secret::OAuthSecret, repository::OAuthResponse};
+use serde::{Deserialize, Serialize};
+
+use crate::oauth::oauth_secret::OAuthSecret;
 
 const PORT: u16 = 8990;
 const BASE_URL: &str = "http://localhost";
 const AUTH_REDIRECT_PATH: &str = "auth";
 
 use warp::reject::Reject;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OAuthResponse {
+    pub access_token: String,
+    pub expires_in: u64,
+    pub refresh_token: Option<String>,
+    scope: String,
+    token_type: String,
+}
+impl OAuthResponse {
+    pub fn from_file() -> Option<Self> {
+        let file = fs::read_to_string("oauth_token_response.json").unwrap_or_else(|_| {
+            fs::write("oauth_token_response.json", "{}").unwrap();
+            "".to_string()
+        });
+        serde_json::from_str(&file).ok()
+    }
+    pub fn parse(data: &str) -> Result<Self, std::io::Error> {
+        let oauth_response: OAuthResponse = serde_json::from_str(data)?;
+        Ok(oauth_response)
+    }
+    pub fn save_to_file(&self) -> Result<(), std::io::Error> {
+        let previous = Self::from_file().unwrap();
+        let updated = OAuthResponse {
+            access_token: self.access_token.clone(),
+            expires_in: self.expires_in,
+            refresh_token: previous.refresh_token.or(self.refresh_token.clone()),
+            scope: self.scope.clone(),
+            token_type: self.token_type.clone(),
+        };
+        fs::write(
+            "oauth_token_response.json",
+            serde_json::to_string(&updated)?,
+        )?;
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 struct ReqwestError;
@@ -52,8 +92,11 @@ async fn handle_oauth_redirect(
     if let Some(code) = params.get("code").cloned() {
         let result = request_access_token_by_redirect(code).await;
 
-        match OAuthResponse::parse_and_save(&result.unwrap()) {
+        match OAuthResponse::parse(&result.unwrap()) {
             Ok(response) => {
+                response
+                    .save_to_file()
+                    .expect("Failed to save OAuthResponse to file");
                 println!("Success to get token!");
             }
             Err(e) => {

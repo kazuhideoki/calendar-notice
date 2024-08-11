@@ -4,9 +4,9 @@ use reqwest::{
     Request,
 };
 
-use crate::repository::OAuthResponse;
-
 use serde::{Deserialize, Serialize};
+
+use crate::oauth::OAuthResponse;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CalendarEvents {

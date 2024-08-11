@@ -4,7 +4,8 @@ use reqwest::StatusCode;
 use std::io::{self, BufRead};
 
 use crate::{
-    google_calendar, oauth::request_access_token_by_refresh_token, repository::OAuthResponse,
+    google_calendar,
+    oauth::{request_access_token_by_refresh_token, OAuthResponse},
 };
 
 #[derive(Parser, Debug)]
@@ -56,8 +57,12 @@ pub async fn wait_for_command() {
                                     request_access_token_by_refresh_token(refresh_token.unwrap())
                                         .await;
 
-                                match OAuthResponse::parse_and_save(&result.unwrap()) {
+                                let oauth_token_response = OAuthResponse::parse(&result.unwrap());
+                                match oauth_token_response {
                                     Ok(response) => {
+                                        response
+                                            .save_to_file()
+                                            .expect("Failed to save OAuthResponse to file");
                                         println!("Success to get token! by refresh token");
                                     }
                                     Err(e) => {

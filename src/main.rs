@@ -4,10 +4,9 @@ mod command_line;
 mod env;
 mod google_calendar;
 mod oauth;
-mod repository;
 
 use command_line as cmd;
-use repository::OAuthResponse;
+use oauth::OAuthResponse;
 
 /**
 * TODO
