@@ -10,14 +10,14 @@ use crate::oauth::OAuthResponse;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CalendarEvents {
-    kind: String,
-    etag: String,
-    summary: String,
-    description: Option<String>,
-    updated: String,
-    time_zone: Option<String>,
-    access_role: Option<String>,
-    default_reminders: Option<Vec<Reminder>>,
+    pub kind: String,
+    pub etag: String,
+    pub summary: String,
+    pub description: Option<String>,
+    pub updated: String,
+    pub time_zone: Option<String>,
+    pub access_role: Option<String>,
+    pub default_reminders: Option<Vec<Reminder>>,
     pub next_page_token: Option<String>,
     pub items: Vec<Event>,
 }
@@ -30,30 +30,60 @@ struct Reminder {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
-    kind: String,
-    etag: String,
-    id: String,
-    status: String,
-    html_link: Option<String>,
-    created: String,
-    updated: String,
+    pub kind: String,
+    pub etag: String,
+    pub id: String,
+    pub status: String,
+    pub html_link: Option<String>,
+    pub created: String,
+    pub updated: String,
     pub summary: String,
-    description: Option<String>,
-    creator: EventPerson,
-    organizer: EventPerson,
+    pub description: Option<String>,
+    pub creator: EventPerson,
+    pub organizer: EventPerson,
     pub start: EventDateTime,
     pub end: EventDateTime,
-    recurring_event_id: Option<String>,
-    original_start_time: Option<EventDateTime>,
-    transparency: Option<String>,
-    visibility: Option<String>,
-    i_cal_uid: Option<String>,
-    sequence: i32,
-    attendees: Option<Vec<Attendee>>,
-    reminders: Option<Reminders>,
-    event_type: Option<String>,
-    hangout_link: Option<String>,
-    conference_data: Option<ConferenceData>,
+    pub recurring_event_id: Option<String>,
+    pub original_start_time: Option<EventDateTime>,
+    pub transparency: Option<String>,
+    pub visibility: Option<String>,
+    pub i_cal_uid: Option<String>,
+    pub sequence: i32,
+    pub attendees: Option<Vec<Attendee>>,
+    pub reminders: Option<Reminders>,
+    pub event_type: Option<String>,
+    pub hangout_link: Option<String>,
+    pub conference_data: Option<ConferenceData>,
+}
+impl Default for Event {
+    fn default() -> Self {
+        Self {
+            kind: String::new(),
+            etag: String::new(),
+            id: String::new(),
+            status: String::new(),
+            html_link: None,
+            created: String::new(),
+            updated: String::new(),
+            summary: String::new(),
+            description: None,
+            creator: EventPerson::default(),
+            organizer: EventPerson::default(),
+            start: EventDateTime::default(),
+            end: EventDateTime::default(),
+            recurring_event_id: None,
+            original_start_time: None,
+            transparency: None,
+            visibility: None,
+            i_cal_uid: None,
+            sequence: 0,
+            attendees: None,
+            reminders: None,
+            event_type: None,
+            hangout_link: None,
+            conference_data: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,15 +92,33 @@ struct EventPerson {
     display_name: Option<String>,
     self_: Option<bool>,
 }
+impl Default for EventPerson {
+    fn default() -> Self {
+        Self {
+            email: String::new(),
+            display_name: None,
+            self_: None,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EventDateTime {
     #[serde(rename = "dateTime", default)]
     pub date_time: Option<String>,
     #[serde(default)]
-    date: Option<String>,
+    pub date: Option<String>,
     #[serde(rename = "timeZone")]
-    time_zone: Option<String>,
+    pub time_zone: Option<String>,
+}
+impl Default for EventDateTime {
+    fn default() -> Self {
+        Self {
+            date_time: None,
+            date: None,
+            time_zone: None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

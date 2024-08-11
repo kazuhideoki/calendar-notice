@@ -1,6 +1,5 @@
 #![allow(unused_variables)]
 use clap::Parser;
-use reqwest::StatusCode;
 use std::io::{self, BufRead};
 
 use crate::{

@@ -11,8 +11,13 @@ use notification::run_notification_cron_thread;
 use oauth::OAuthResponse;
 
 /**
- TODO
- -
+  TODO
+  - DB スキーマ
+    - OAuthResponse
+    - イベント (summary, description, status, id, start, end )
+      - 通知設定とのリレーション
+    - 通知設定 (on/off)
+  - ORM
 */
 #[tokio::main]
 async fn main() {
