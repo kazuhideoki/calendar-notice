@@ -11,6 +11,7 @@ const NOTIFICATION_INTERVAL_SEC: u16 = 60 * 10;
 pub fn run_notification_cron_thread() {
     tokio::spawn(async {
         loop {
+            // TODO Unauthorized が返ってきたら再認証する
             let events = google_calendar::list_events().await.expect(
                 "Failed to get events from Google Calendar. Please check your network connection.",
             );

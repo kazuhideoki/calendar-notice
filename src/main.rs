@@ -1,15 +1,13 @@
 #![allow(unused_variables)]
-#[macro_use]
-pub extern crate diesel;
 
 mod command_line;
 mod env;
 mod google_calendar;
 mod notification;
 mod oauth;
+pub mod schema;
 
 use command_line as cmd;
-use diesel::prelude::*;
 use notification::run_notification_cron_thread;
 use oauth::OAuthResponse;
 

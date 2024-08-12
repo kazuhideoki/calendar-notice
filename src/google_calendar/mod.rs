@@ -1,8 +1,6 @@
+#![allow(unused_variables)]
 use chrono::Days;
-use reqwest::{
-    header::{HeaderMap, HeaderValue, InvalidHeaderValue},
-    Request,
-};
+use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
 use serde::{Deserialize, Serialize};
 
@@ -23,17 +21,34 @@ pub struct CalendarEvents {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Reminder {
+pub struct Reminder {
     method: String,
     minutes: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum EventStatus {
+    Confirmed,
+    Tentative,
+    Cancelled,
+    #[serde(other)]
+    Unknown,
+}
+
+/**
+ * TODO model と融合？
+ * ※基本的に利用したい値(DB)とGoogle Calendar API の値が一致しているはず。
+ * その場合、レスポンスからの変換方法を別途定義する必要があるのか？
+ *
+ * TODO 不要な値を削る
+ */
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
     pub kind: String,
     pub etag: String,
     pub id: String,
-    pub status: String,
+    pub status: Option<EventStatus>,
     pub html_link: Option<String>,
     pub created: String,
     pub updated: String,
@@ -61,7 +76,7 @@ impl Default for Event {
             kind: String::new(),
             etag: String::new(),
             id: String::new(),
-            status: String::new(),
+            status: Some(EventStatus::Tentative),
             html_link: None,
             created: String::new(),
             updated: String::new(),
@@ -87,7 +102,7 @@ impl Default for Event {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct EventPerson {
+pub struct EventPerson {
     email: String,
     display_name: Option<String>,
     self_: Option<bool>,
@@ -122,7 +137,7 @@ impl Default for EventDateTime {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Attendee {
+pub struct Attendee {
     email: String,
     display_name: Option<String>,
     organizer: Option<bool>,
@@ -131,19 +146,19 @@ struct Attendee {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Reminders {
+pub struct Reminders {
     use_default: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ConferenceData {
+pub struct ConferenceData {
     entry_points: Vec<EntryPoint>,
     conference_solution: ConferenceSolution,
     conference_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct EntryPoint {
+pub struct EntryPoint {
     entry_point_type: String,
     uri: String,
     label: Option<String>,
@@ -152,14 +167,14 @@ struct EntryPoint {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ConferenceSolution {
+pub struct ConferenceSolution {
     key: ConferenceSolutionKey,
     name: String,
     icon_uri: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ConferenceSolutionKey {
+pub struct ConferenceSolutionKey {
     #[serde(rename = "type")]
     type_: String,
 }
