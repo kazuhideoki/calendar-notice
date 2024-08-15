@@ -1,5 +1,5 @@
 CREATE TABLE events (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY NOT NULL,
   summary TEXT NOT NULL,
   description TEXT,
   status TEXT,

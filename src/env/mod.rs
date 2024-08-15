@@ -4,6 +4,7 @@ use std::env;
 
 pub struct Env {
     pub test_token: Option<String>,
+    pub database_url: String,
 }
 
 impl Env {
@@ -12,6 +13,7 @@ impl Env {
 
         Env {
             test_token: env::var("TEST_TOKEN").ok(),
+            database_url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
         }
     }
 }

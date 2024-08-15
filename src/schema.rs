@@ -2,7 +2,7 @@
 
 diesel::table! {
     events (id) {
-        id -> Nullable<Text>,
+        id -> Text,
         summary -> Text,
         description -> Nullable<Text>,
         status -> Nullable<Text>,
@@ -10,3 +10,18 @@ diesel::table! {
         end_datetime -> Text,
     }
 }
+
+diesel::table! {
+    notifications (event_id) {
+        event_id -> Text,
+        enabled -> Bool,
+        notification_time_from_start -> Integer,
+    }
+}
+
+diesel::joinable!(notifications -> events (event_id));
+
+diesel::allow_tables_to_appear_in_same_query!(
+    events,
+    notifications,
+);
