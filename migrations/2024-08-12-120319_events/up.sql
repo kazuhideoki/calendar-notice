@@ -3,8 +3,8 @@ CREATE TABLE events (
   summary TEXT NOT NULL,
   description TEXT,
   status TEXT,
-  start_datetime TEXT NOT NULL,
-  end_datetime TEXT NOT NULL,
+  start_datetime DATETIME NOT NULL,
+  end_datetime DATETIME NOT NULL,
   CHECK (
     start_datetime IS datetime(start_datetime) AND
     end_datetime IS datetime(end_datetime) AND

@@ -6,8 +6,8 @@ diesel::table! {
         summary -> Text,
         description -> Nullable<Text>,
         status -> Nullable<Text>,
-        start_datetime -> Text,
-        end_datetime -> Text,
+        start_datetime -> Timestamp,
+        end_datetime -> Timestamp,
     }
 }
 
@@ -19,9 +19,22 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    oauth_tokens (id) {
+        id -> Nullable<Integer>,
+        access_token -> Text,
+        expires_in -> Nullable<Timestamp>,
+        refresh_token -> Nullable<Text>,
+        scope -> Nullable<Text>,
+        token_type -> Nullable<Text>,
+        created_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(notifications -> events (event_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     events,
     notifications,
+    oauth_tokens,
 );

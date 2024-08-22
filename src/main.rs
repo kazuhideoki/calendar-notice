@@ -1,45 +1,31 @@
 #![allow(unused_variables)]
 
 mod command_line;
+mod db;
 mod env;
 mod google_calendar;
 mod models;
 mod notification;
 mod oauth;
-pub mod schema;
+mod schema;
 
 use command_line as cmd;
-use diesel::connection::SimpleConnection;
-use env::Env;
+use db::establish_connection;
 use models::{Event, Notification};
 use notification::run_notification_cron_thread;
 use oauth::OAuthResponse;
 
 use diesel::prelude::*;
-use diesel::sqlite::SqliteConnection;
 use schema::{events, notifications};
-
-pub fn establish_connection() -> SqliteConnection {
-    // let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let database_url = Env::new().database_url;
-    let mut conn = SqliteConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url));
-
-    // conn.execute("PRAGMA foreign_keys = ON")
-    conn.batch_execute("PRAGMA foreign_keys = ON")
-        .expect("Failed to enable foreign keys");
-
-    conn
-}
 
 /**
   TODO
-  - ORM diesel で DB にアクセスする
-  - DB スキーマ
-    - OAuthResponse
-    - イベント (summary, description, status, id, start, end )
-      - 通知設定とのリレーション
-    - 通知設定 (on/off);
+  - db module 整理
+    - oauth_tokens で insert, select できるように
+    - OAuth を file から DB 参照に
+  - カレンダー
+    - 保存 と OAuth をいい感じに
+    - 表示は DB 参照
 */
 #[tokio::main]
 async fn main() {
