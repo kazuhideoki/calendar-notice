@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     db::establish_connection,
-    models::OAuthToken,
     oauth::oauth_secret::OAuthSecret,
+    repository::models::OAuthToken,
     schema::oauth_tokens::{self},
 };
 
@@ -32,13 +32,6 @@ pub struct OAuthResponse {
 }
 impl OAuthResponse {
     pub fn from_db() -> Option<Self> {
-        /* deprecated */
-        let file = fs::read_to_string("oauth_token_response.json").unwrap_or_else(|_| {
-            fs::write("oauth_token_response.json", "{}").unwrap();
-            "".to_string()
-        });
-        // serde_json::from_str(&file).ok()
-
         let mut conn = establish_connection();
         let result = oauth_tokens::table
             .order(oauth_tokens::created_at.desc())

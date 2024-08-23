@@ -6,8 +6,8 @@ use std::io::{self, BufRead};
 use crate::{
     db::establish_connection,
     google_calendar,
-    models::OAuthToken,
     oauth::{request_access_token_by_refresh_token, OAuthResponse},
+    repository::models::OAuthToken,
     schema::oauth_tokens,
 };
 

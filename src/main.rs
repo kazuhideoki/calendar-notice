@@ -4,27 +4,29 @@ mod command_line;
 mod db;
 mod env;
 mod google_calendar;
-mod models;
 mod notification;
 mod oauth;
+mod repository;
 mod schema;
 
 use command_line as cmd;
 use db::establish_connection;
-use models::{Event, Notification};
 use notification::run_notification_cron_thread;
 use oauth::OAuthResponse;
 
 use diesel::prelude::*;
+use repository::models::{Event, Notification};
 use schema::{events, notifications};
 
 /**
   TODO
   - oauth_tokens で insert, select できるように✅
   - db module 整理
-    -
+    - schema, models, repository の単位でまとめる
+    - 従来の他モジュールからの責務分離
+
   - カレンダー
-    - 保存 と OAuth をいい感じに
+    - db に保存
     - 表示は DB 参照
 */
 #[tokio::main]

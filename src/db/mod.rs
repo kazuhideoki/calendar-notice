@@ -1,5 +1,3 @@
-use std::sync::{Mutex, OnceLock};
-
 use crate::env::Env;
 use diesel::connection::SimpleConnection;
 use diesel::prelude::*;

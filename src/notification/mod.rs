@@ -7,7 +7,7 @@ use filter_upcoming_events::filter_upcoming_events;
 use crate::{
     db::establish_connection,
     google_calendar,
-    models::OAuthToken,
+    repository::models::OAuthToken,
     schema::oauth_tokens::{self},
 };
 mod filter_upcoming_events;
