@@ -1,7 +1,7 @@
 CREATE TABLE oauth_tokens (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY NOT NULL,
     access_token TEXT NOT NULL,
-    expires_in DATETIME CHECK(expires_in IS datetime(expires_in) AND expires_in > CURRENT_TIMESTAMP),
+    expires_in DATETIME,
     refresh_token TEXT,
     scope TEXT,
     token_type VARCHAR(20),

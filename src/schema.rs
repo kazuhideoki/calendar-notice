@@ -21,7 +21,7 @@ diesel::table! {
 
 diesel::table! {
     oauth_tokens (id) {
-        id -> Nullable<Integer>,
+        id -> Text,
         access_token -> Text,
         expires_in -> Nullable<Timestamp>,
         refresh_token -> Nullable<Text>,

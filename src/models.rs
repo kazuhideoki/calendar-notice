@@ -1,7 +1,7 @@
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::schema::{events, notifications};
+use crate::schema::{events, notifications, oauth_tokens};
 
 #[derive(
     Debug, Queryable, Selectable, Identifiable, Insertable, AsChangeset, Serialize, Deserialize,
@@ -27,4 +27,20 @@ pub struct Notification {
     pub event_id: String,
     pub enabled: bool,
     pub notification_time_from_start: i32,
+}
+
+#[derive(
+    Debug, Queryable, Selectable, Identifiable, Insertable, AsChangeset, Serialize, Deserialize,
+)]
+#[diesel(table_name = oauth_tokens)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(primary_key(id))]
+pub struct OAuthToken {
+    pub id: String,
+    pub access_token: String,
+    pub expires_in: Option<String>,
+    pub refresh_token: Option<String>,
+    pub scope: Option<String>,
+    pub token_type: Option<String>,
+    pub created_at: String,
 }

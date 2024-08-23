@@ -1,10 +1,14 @@
 #![allow(unused_variables)]
 use clap::Parser;
+use diesel::{query_dsl::methods::OrderDsl, ExpressionMethods, OptionalExtension, RunQueryDsl};
 use std::io::{self, BufRead};
 
 use crate::{
+    db::establish_connection,
     google_calendar,
+    models::OAuthToken,
     oauth::{request_access_token_by_refresh_token, OAuthResponse},
+    schema::oauth_tokens,
 };
 
 #[derive(Parser, Debug)]
@@ -29,9 +33,23 @@ pub async fn wait_for_command() {
                 // ここでコマンドを処理する
 
                 match input.as_str() {
-                    "token" => println!("{:?}", OAuthResponse::from_file()),
+                    "token" => println!("{:?}", OAuthResponse::from_db()),
                     "event" => {
-                        let result = google_calendar::list_events().await;
+                        let mut conn = establish_connection();
+                        let latest_token = oauth_tokens::table
+                            .order(oauth_tokens::created_at.desc())
+                            .first::<OAuthToken>(&mut conn)
+                            .optional()
+                            .expect("Error loading oauth token");
+                        if latest_token.is_none() {
+                            // TODO token 切れチェック
+                            // TODO Unauthorized が返ってきたら再認証する
+                            println!("OAuth token is not found. Please authenticate again.");
+                            continue;
+                        }
+
+                        let result =
+                            google_calendar::list_events(latest_token.unwrap().access_token).await;
 
                         match result {
                             Ok(events) => {
@@ -45,9 +63,8 @@ pub async fn wait_for_command() {
                                 );
                             }
                             Err(google_calendar::Error::Unauthorized) => {
-                                let OAuthResponse { refresh_token, .. } =
-                                    OAuthResponse::from_file()
-                                        .expect("Failed to get OAuthResponse from file");
+                                let OAuthResponse { refresh_token, .. } = OAuthResponse::from_db()
+                                    .expect("Failed to get OAuthResponse from file");
                                 if refresh_token.is_none() {
                                     println!("Refresh token is not found");
                                     continue;
@@ -60,7 +77,7 @@ pub async fn wait_for_command() {
                                 match oauth_token_response {
                                     Ok(response) => {
                                         response
-                                            .save_to_file()
+                                            .save_to_db()
                                             .expect("Failed to save OAuthResponse to file");
                                         println!("Success to get token! by refresh token");
                                     }

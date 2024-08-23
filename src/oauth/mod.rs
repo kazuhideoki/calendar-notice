@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 mod oauth_secret;
 
+use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
 use std::fs;
@@ -8,7 +9,12 @@ use warp::Filter;
 
 use serde::{Deserialize, Serialize};
 
-use crate::oauth::oauth_secret::OAuthSecret;
+use crate::{
+    db::establish_connection,
+    models::OAuthToken,
+    oauth::oauth_secret::OAuthSecret,
+    schema::oauth_tokens::{self},
+};
 
 const PORT: u16 = 8990;
 const BASE_URL: &str = "http://localhost";
@@ -25,30 +31,51 @@ pub struct OAuthResponse {
     token_type: String,
 }
 impl OAuthResponse {
-    pub fn from_file() -> Option<Self> {
+    pub fn from_db() -> Option<Self> {
+        /* deprecated */
         let file = fs::read_to_string("oauth_token_response.json").unwrap_or_else(|_| {
             fs::write("oauth_token_response.json", "{}").unwrap();
             "".to_string()
         });
-        serde_json::from_str(&file).ok()
+        // serde_json::from_str(&file).ok()
+
+        let mut conn = establish_connection();
+        let result = oauth_tokens::table
+            .order(oauth_tokens::created_at.desc())
+            .first::<OAuthToken>(&mut conn)
+            .optional()
+            .expect("Error loading oauth token");
+
+        match result {
+            Some(result) => Some(OAuthResponse {
+                access_token: result.access_token,
+                expires_in: result.expires_in.unwrap().parse().unwrap(),
+                refresh_token: result.refresh_token,
+                scope: result.scope.unwrap(),
+                token_type: result.token_type.unwrap(),
+            }),
+            None => None,
+        }
     }
     pub fn parse(data: &str) -> Result<Self, std::io::Error> {
         let oauth_response: OAuthResponse = serde_json::from_str(data)?;
         Ok(oauth_response)
     }
-    pub fn save_to_file(&self) -> Result<(), std::io::Error> {
-        let previous = Self::from_file().unwrap();
-        let updated = OAuthResponse {
+    pub fn save_to_db(&self) -> Result<(), std::io::Error> {
+        let oauth_token = OAuthToken {
+            id: uuid::Uuid::new_v4().to_string(),
             access_token: self.access_token.clone(),
-            expires_in: self.expires_in,
-            refresh_token: previous.refresh_token.or(self.refresh_token.clone()),
-            scope: self.scope.clone(),
-            token_type: self.token_type.clone(),
+            expires_in: Some(self.expires_in.to_string()),
+            refresh_token: self.refresh_token.clone(),
+            scope: Some(self.scope.clone()),
+            token_type: Some(self.token_type.clone()),
+            created_at: chrono::Local::now().to_rfc3339(),
         };
-        fs::write(
-            "oauth_token_response.json",
-            serde_json::to_string(&updated)?,
-        )?;
+        let mut conn = establish_connection();
+        diesel::insert_into(oauth_tokens::table)
+            .values(&oauth_token)
+            .execute(&mut conn)
+            .expect("Error saving new oauth token");
         Ok(())
     }
 }
@@ -84,7 +111,7 @@ pub fn run_redirect_server() {
 async fn handle_oauth_redirect(
     params: std::collections::HashMap<String, String>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    if OAuthResponse::from_file().is_some() {
+    if OAuthResponse::from_db().is_some() {
         return Ok("Completed".to_string());
     }
 
@@ -95,7 +122,7 @@ async fn handle_oauth_redirect(
         match OAuthResponse::parse(&result.unwrap()) {
             Ok(response) => {
                 response
-                    .save_to_file()
+                    .save_to_db()
                     .expect("Failed to save OAuthResponse to file");
                 println!("Success to get token!");
             }

@@ -196,11 +196,7 @@ impl From<InvalidHeaderValue> for Error {
     }
 }
 
-pub async fn list_events() -> Result<CalendarEvents, Error> {
-    let access_token = OAuthResponse::from_file()
-        .expect("Failed to get OAuthResponse from file")
-        .access_token;
-
+pub async fn list_events(access_token: String) -> Result<CalendarEvents, Error> {
     let url = format!(
         "https://www.googleapis.com/calendar/v3/calendars/{}/events",
         "primary"

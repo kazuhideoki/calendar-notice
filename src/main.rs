@@ -20,9 +20,9 @@ use schema::{events, notifications};
 
 /**
   TODO
+  - oauth_tokens で insert, select できるように✅
   - db module 整理
-    - oauth_tokens で insert, select できるように
-    - OAuth を file から DB 参照に
+    -
   - カレンダー
     - 保存 と OAuth をいい感じに
     - 表示は DB 参照
@@ -30,7 +30,6 @@ use schema::{events, notifications};
 #[tokio::main]
 async fn main() {
     let mut conn = establish_connection();
-
     let results: Vec<(Event, Notification)> = events::table
         .inner_join(notifications::table)
         .select((Event::as_select(), Notification::as_select()))
@@ -38,7 +37,7 @@ async fn main() {
         .expect("Error loading events");
     println! {"{:?}", results};
 
-    if OAuthResponse::from_file().is_none() {
+    if OAuthResponse::from_db().is_none() {
         oauth::to_oauth_on_browser();
     }
 
