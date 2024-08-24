@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 mod oauth_secret;
 
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
 use std::fs;
@@ -10,9 +9,8 @@ use warp::Filter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::establish_connection,
     oauth::oauth_secret::OAuthSecret,
-    repository::models::OAuthToken,
+    repository::{self, models::OAuthToken},
     schema::oauth_tokens::{self},
 };
 
@@ -32,14 +30,9 @@ pub struct OAuthResponse {
 }
 impl OAuthResponse {
     pub fn from_db() -> Option<Self> {
-        let mut conn = establish_connection();
-        let result = oauth_tokens::table
-            .order(oauth_tokens::created_at.desc())
-            .first::<OAuthToken>(&mut conn)
-            .optional()
-            .expect("Error loading oauth token");
+        let latest_token = repository::oauth_token::find_latest().unwrap();
 
-        match result {
+        match latest_token {
             Some(result) => Some(OAuthResponse {
                 access_token: result.access_token,
                 expires_in: result.expires_in.unwrap().parse().unwrap(),
@@ -64,12 +57,7 @@ impl OAuthResponse {
             token_type: Some(self.token_type.clone()),
             created_at: chrono::Local::now().to_rfc3339(),
         };
-        let mut conn = establish_connection();
-        diesel::insert_into(oauth_tokens::table)
-            .values(&oauth_token)
-            .execute(&mut conn)
-            .expect("Error saving new oauth token");
-        Ok(())
+        repository::oauth_token::create(oauth_token)
     }
 }
 

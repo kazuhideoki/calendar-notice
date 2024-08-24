@@ -5,9 +5,7 @@ use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use filter_upcoming_events::filter_upcoming_events;
 
 use crate::{
-    db::establish_connection,
-    google_calendar,
-    repository::models::OAuthToken,
+    google_calendar, repository,
     schema::oauth_tokens::{self},
 };
 mod filter_upcoming_events;
@@ -17,12 +15,7 @@ const NOTIFICATION_INTERVAL_SEC: u16 = 60 * 10;
 pub fn run_notification_cron_thread() {
     tokio::spawn(async {
         loop {
-            let mut conn = establish_connection();
-            let latest_token = oauth_tokens::table
-                .order(oauth_tokens::created_at.desc())
-                .first::<OAuthToken>(&mut conn)
-                .optional()
-                .expect("Error loading oauth token");
+            let latest_token = repository::oauth_token::find_latest().unwrap();
             match latest_token {
                 Some(oauth_token) => {
                     let events = google_calendar::list_events(oauth_token.access_token).await.expect(

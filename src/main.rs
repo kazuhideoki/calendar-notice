@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 
 mod command_line;
-mod db;
 mod env;
 mod google_calendar;
 mod notification;
@@ -10,7 +9,6 @@ mod repository;
 mod schema;
 
 use command_line as cmd;
-use db::establish_connection;
 use notification::run_notification_cron_thread;
 use oauth::OAuthResponse;
 
@@ -20,9 +18,9 @@ use schema::{events, notifications};
 
 /**
   TODO
-  - oauth_tokens で insert, select できるように✅
   - db module 整理
-    - schema, models, repository の単位でまとめる
+    - models, repository の単位でまとめる✅
+    - google accessToken/refresh の取得 を repository に移動?
     - 従来の他モジュールからの責務分離
 
   - カレンダー
@@ -31,13 +29,12 @@ use schema::{events, notifications};
 */
 #[tokio::main]
 async fn main() {
-    let mut conn = establish_connection();
-    let results: Vec<(Event, Notification)> = events::table
-        .inner_join(notifications::table)
-        .select((Event::as_select(), Notification::as_select()))
-        .load(&mut conn)
-        .expect("Error loading events");
-    println! {"{:?}", results};
+    // let results: Vec<(Event, Notification)> = events::table
+    //     .inner_join(notifications::table)
+    //     .select((Event::as_select(), Notification::as_select()))
+    //     .load(&mut conn)
+    //     .expect("Error loading events");
+    // println! {"{:?}", results};
 
     if OAuthResponse::from_db().is_none() {
         oauth::to_oauth_on_browser();

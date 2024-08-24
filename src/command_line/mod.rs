@@ -1,14 +1,11 @@
 #![allow(unused_variables)]
 use clap::Parser;
-use diesel::{query_dsl::methods::OrderDsl, ExpressionMethods, OptionalExtension, RunQueryDsl};
 use std::io::{self, BufRead};
 
 use crate::{
-    db::establish_connection,
     google_calendar,
     oauth::{request_access_token_by_refresh_token, OAuthResponse},
-    repository::models::OAuthToken,
-    schema::oauth_tokens,
+    repository,
 };
 
 #[derive(Parser, Debug)]
@@ -35,12 +32,7 @@ pub async fn wait_for_command() {
                 match input.as_str() {
                     "token" => println!("{:?}", OAuthResponse::from_db()),
                     "event" => {
-                        let mut conn = establish_connection();
-                        let latest_token = oauth_tokens::table
-                            .order(oauth_tokens::created_at.desc())
-                            .first::<OAuthToken>(&mut conn)
-                            .optional()
-                            .expect("Error loading oauth token");
+                        let latest_token = repository::oauth_token::find_latest().unwrap();
                         if latest_token.is_none() {
                             // TODO token 切れチェック
                             // TODO Unauthorized が返ってきたら再認証する
