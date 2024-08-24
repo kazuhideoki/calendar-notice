@@ -1,9 +1,9 @@
 #![allow(unused_variables)]
+pub mod is_token_expired;
 mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
-use std::fs;
 use warp::Filter;
 
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     oauth::oauth_secret::OAuthSecret,
     repository::{self, models::OAuthToken},
-    schema::oauth_tokens::{self},
 };
 
 const PORT: u16 = 8990;
@@ -32,19 +31,6 @@ impl OAuthResponse {
     pub fn parse(data: &str) -> Result<Self, std::io::Error> {
         let oauth_response: OAuthResponse = serde_json::from_str(data)?;
         Ok(oauth_response)
-    }
-    pub fn save_to_db(&self) -> Result<(), std::io::Error> {
-        let oauth_token = OAuthToken {
-            id: uuid::Uuid::new_v4().to_string(),
-            access_token: self.access_token.clone(),
-            expires_in: Some(self.expires_in.to_string()),
-            refresh_token: self.refresh_token.clone(),
-            scope: Some(self.scope.clone()),
-            token_type: Some(self.token_type.clone()),
-            created_at: chrono::Local::now().to_rfc3339(),
-            updated_at: chrono::Local::now().to_rfc3339(),
-        };
-        repository::oauth_token::create(oauth_token)
     }
 }
 
@@ -177,13 +163,4 @@ fn generate_code_challenge() -> String {
         .map(char::from)
         .collect();
     verifier
-}
-
-pub fn is_token_expired(token: &OAuthToken) -> bool {
-    let created_at = chrono::DateTime::parse_from_rfc3339(&token.created_at).unwrap();
-    let expires_in = token.expires_in.as_ref().unwrap().parse::<i64>().unwrap();
-    let expires_at = created_at + chrono::Duration::seconds(expires_in);
-    let now = chrono::Local::now();
-
-    expires_at < now
 }

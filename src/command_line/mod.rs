@@ -4,7 +4,10 @@ use std::io::{self, BufRead};
 
 use crate::{
     google_calendar,
-    oauth::{is_token_expired, request_access_token_by_refresh_token, OAuthResponse},
+    oauth::{
+        self, is_token_expired::is_token_expired, request_access_token_by_refresh_token,
+        OAuthResponse,
+    },
     repository::{
         self,
         models::{OAuthToken, OAuthTokenUpdate},
@@ -52,7 +55,7 @@ pub async fn wait_for_command() {
                         let latest_token = repository::oauth_token::find_latest().unwrap();
                         if latest_token
                             .as_ref()
-                            .map_or(true, |token| is_token_expired(token))
+                            .map_or(true, |token| is_token_expired(token, chrono::Local::now()))
                         {
                             println!("OAuth token is not found. Please authenticate again.");
                             continue;

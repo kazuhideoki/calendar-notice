@@ -46,6 +46,21 @@ pub struct OAuthToken {
     pub updated_at: String,
 }
 
+impl Default for OAuthToken {
+    fn default() -> Self {
+        OAuthToken {
+            id: uuid::Uuid::new_v4().to_string(),
+            access_token: "".to_string(),
+            expires_in: None,
+            refresh_token: None,
+            scope: None,
+            token_type: None,
+            created_at: "2024-08-01T00:00:00".to_string(),
+            updated_at: "2024-08-01T00:00:00".to_string(),
+        }
+    }
+}
+
 #[derive(Queryable, AsChangeset)]
 #[diesel(table_name = oauth_tokens)]
 pub struct OAuthTokenUpdate {
