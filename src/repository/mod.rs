@@ -20,11 +20,23 @@ pub mod oauth_token {
 
     use crate::{repository::models::OAuthToken, schema::oauth_tokens};
 
-    use super::get_connection;
+    use super::{get_connection, models::OAuthTokenUpdate};
 
     pub fn create(oauth_token: OAuthToken) -> Result<(), std::io::Error> {
         let result = diesel::insert_into(oauth_tokens::table)
             .values(&oauth_token)
+            .execute(&mut get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+
+    pub fn update(id: String, oauth_token_update: OAuthTokenUpdate) -> Result<(), std::io::Error> {
+        let result = diesel::update(oauth_tokens::table.find(&id))
+            .set(&oauth_token_update)
             .execute(&mut get_connection());
 
         match result {

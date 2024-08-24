@@ -25,24 +25,10 @@ pub struct OAuthResponse {
     pub access_token: String,
     pub expires_in: u64,
     pub refresh_token: Option<String>,
-    scope: String,
-    token_type: String,
+    pub scope: String,
+    pub token_type: String,
 }
 impl OAuthResponse {
-    pub fn from_db() -> Option<Self> {
-        let latest_token = repository::oauth_token::find_latest().unwrap();
-
-        match latest_token {
-            Some(result) => Some(OAuthResponse {
-                access_token: result.access_token,
-                expires_in: result.expires_in.unwrap().parse().unwrap(),
-                refresh_token: result.refresh_token,
-                scope: result.scope.unwrap(),
-                token_type: result.token_type.unwrap(),
-            }),
-            None => None,
-        }
-    }
     pub fn parse(data: &str) -> Result<Self, std::io::Error> {
         let oauth_response: OAuthResponse = serde_json::from_str(data)?;
         Ok(oauth_response)
@@ -56,6 +42,7 @@ impl OAuthResponse {
             scope: Some(self.scope.clone()),
             token_type: Some(self.token_type.clone()),
             created_at: chrono::Local::now().to_rfc3339(),
+            updated_at: chrono::Local::now().to_rfc3339(),
         };
         repository::oauth_token::create(oauth_token)
     }
@@ -92,19 +79,22 @@ pub fn run_redirect_server() {
 async fn handle_oauth_redirect(
     params: std::collections::HashMap<String, String>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    if OAuthResponse::from_db().is_some() {
-        return Ok("Completed".to_string());
-    }
-
-    // 認証コードを取得時
     if let Some(code) = params.get("code").cloned() {
         let result = request_access_token_by_redirect(code).await;
 
         match OAuthResponse::parse(&result.unwrap()) {
             Ok(response) => {
-                response
-                    .save_to_db()
-                    .expect("Failed to save OAuthResponse to file");
+                let oauth_token = OAuthToken {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    access_token: response.access_token.clone(),
+                    expires_in: Some(response.expires_in.to_string()),
+                    refresh_token: response.refresh_token.clone(),
+                    scope: Some(response.scope.clone()),
+                    token_type: Some(response.token_type.clone()),
+                    created_at: chrono::Local::now().to_rfc3339(),
+                    updated_at: chrono::Local::now().to_rfc3339(),
+                };
+                let _ = repository::oauth_token::create(oauth_token);
                 println!("Success to get token!");
             }
             Err(e) => {
@@ -187,4 +177,13 @@ fn generate_code_challenge() -> String {
         .map(char::from)
         .collect();
     verifier
+}
+
+pub fn is_token_expired(token: &OAuthToken) -> bool {
+    let created_at = chrono::DateTime::parse_from_rfc3339(&token.created_at).unwrap();
+    let expires_in = token.expires_in.as_ref().unwrap().parse::<i64>().unwrap();
+    let expires_at = created_at + chrono::Duration::seconds(expires_in);
+    let now = chrono::Local::now();
+
+    expires_at < now
 }

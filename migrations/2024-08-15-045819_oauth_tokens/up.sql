@@ -5,5 +5,6 @@ CREATE TABLE oauth_tokens (
     refresh_token TEXT,
     scope TEXT,
     token_type VARCHAR(20),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
 );

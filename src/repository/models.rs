@@ -43,4 +43,16 @@ pub struct OAuthToken {
     pub scope: Option<String>,
     pub token_type: Option<String>,
     pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Queryable, AsChangeset)]
+#[diesel(table_name = oauth_tokens)]
+pub struct OAuthTokenUpdate {
+    pub access_token: Option<String>,
+    pub expires_in: Option<String>,
+    pub refresh_token: Option<String>,
+    pub scope: Option<String>,
+    pub token_type: Option<String>,
+    pub updated_at: String,
 }

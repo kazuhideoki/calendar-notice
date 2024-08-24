@@ -28,6 +28,7 @@ diesel::table! {
         scope -> Nullable<Text>,
         token_type -> Nullable<Text>,
         created_at -> Timestamp,
+        updated_at -> Timestamp,
     }
 }
 
