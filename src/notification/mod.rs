@@ -6,7 +6,7 @@ use filter_upcoming_events::filter_upcoming_events;
 use crate::repository::{self};
 mod filter_upcoming_events;
 
-const NOTIFICATION_INTERVAL_SEC: u16 = 60 * 10;
+const NOTIFICATION_INTERVAL_SEC: u16 = 60;
 
 pub fn run_notification_cron_thread() {
     tokio::spawn(async {
@@ -32,6 +32,11 @@ pub fn run_notification_cron_thread() {
                 }
                 Err(e) => println!("Failed to get events: {:?}", e),
             }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(
+                NOTIFICATION_INTERVAL_SEC.into(),
+            ))
+            .await;
         }
     });
 }

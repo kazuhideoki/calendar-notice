@@ -82,7 +82,11 @@ pub mod oauth_token {
         match result {
             Ok(_) => Ok(()),
             // TODO エラー定義
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            // Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            Err(e) => {
+                println!("Error occurred when updating oauth token: {:?}", e);
+                Err(std::io::Error::new(std::io::ErrorKind::Other, e))
+            }
         }
     }
 

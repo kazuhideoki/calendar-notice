@@ -5,7 +5,15 @@ use serde::{Deserialize, Serialize};
 use crate::schema::{events, notifications, oauth_tokens};
 
 #[derive(
-    Debug, Queryable, Selectable, Identifiable, Insertable, AsChangeset, Serialize, Deserialize,
+    Debug,
+    Queryable,
+    Selectable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Serialize,
+    Deserialize,
+    Clone,
 )]
 #[diesel(table_name = events)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -18,6 +26,18 @@ pub struct Event {
     pub start_datetime: String,
     pub end_datetime: String,
 }
+impl Default for Event {
+    fn default() -> Self {
+        Event {
+            id: uuid::Uuid::new_v4().to_string(),
+            summary: "".to_string(),
+            description: None,
+            status: None,
+            start_datetime: chrono::Local::now().to_rfc3339(),
+            end_datetime: (chrono::Local::now() + chrono::Duration::hours(1)).to_rfc3339(),
+        }
+    }
+}
 
 pub struct EventFindMany {
     pub from: String,
@@ -25,7 +45,15 @@ pub struct EventFindMany {
 }
 
 #[derive(
-    Debug, Queryable, Selectable, Identifiable, Insertable, AsChangeset, Serialize, Deserialize,
+    Debug,
+    Queryable,
+    Selectable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Serialize,
+    Deserialize,
+    Clone,
 )]
 #[diesel(table_name = notifications)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -37,7 +65,15 @@ pub struct Notification {
 }
 
 #[derive(
-    Debug, Queryable, Selectable, Identifiable, Insertable, AsChangeset, Serialize, Deserialize,
+    Debug,
+    Queryable,
+    Selectable,
+    Identifiable,
+    Insertable,
+    AsChangeset,
+    Serialize,
+    Deserialize,
+    Clone,
 )]
 #[diesel(table_name = oauth_tokens)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
