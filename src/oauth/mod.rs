@@ -14,7 +14,7 @@ use crate::{
     oauth::oauth_secret::OAuthSecret,
     repository::{
         self,
-        models::{Event, OAuthToken},
+        models::{Event, OAuthToken, OAuthTokenUpdate},
     },
 };
 
@@ -56,7 +56,7 @@ pub fn to_oauth_on_browser() {
     open::that(oauth_url).expect("Failed to open URL in browser");
 }
 
-pub fn run_redirect_server() {
+pub fn spawn_redirect_server() {
     tokio::spawn(async {
         let routes = warp::path(AUTH_REDIRECT_PATH)
             .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -171,7 +171,7 @@ async fn request_access_token_by_redirect(code: String) -> Result<String, reqwes
 
     result
 }
-pub async fn request_access_token_by_refresh_token(
+async fn request_access_token_by_refresh_token(
     refresh_token: String,
 ) -> Result<String, reqwest::Error> {
     let OAuthSecret {
@@ -198,6 +198,29 @@ pub async fn request_access_token_by_refresh_token(
     };
 
     result
+}
+
+pub async fn refresh_and_save_token(id: String, refresh_token: String) {
+    let result = request_access_token_by_refresh_token(refresh_token).await;
+
+    let oauth_token_response = OAuthResponse::parse(&result.unwrap());
+    match oauth_token_response {
+        Ok(response) => {
+            let token_update = OAuthTokenUpdate {
+                access_token: Some(response.access_token),
+                expires_in: Some(response.expires_in.to_string()),
+                refresh_token: response.refresh_token,
+                scope: Some(response.scope),
+                token_type: Some(response.token_type),
+                updated_at: chrono::Local::now().to_rfc3339(),
+            };
+            let _ = repository::oauth_token::update(id, token_update);
+            println!("Success to get token! by refresh token");
+        }
+        Err(e) => {
+            println!("Recv error: {:?}", e.to_string());
+        }
+    }
 }
 
 fn generate_code_challenge() -> String {

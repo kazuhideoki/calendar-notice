@@ -8,7 +8,7 @@ mod filter_upcoming_events;
 
 const NOTIFICATION_INTERVAL_SEC: u16 = 60;
 
-pub fn run_notification_cron_thread() {
+pub fn spawn_notification_cron() {
     tokio::spawn(async {
         loop {
             let events = repository::event::find_many(repository::models::EventFindMany {

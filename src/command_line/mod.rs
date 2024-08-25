@@ -4,10 +4,7 @@ use std::io::{self, BufRead, Error};
 
 use crate::{
     google_calendar,
-    oauth::{
-        self, is_token_expired::is_token_expired, request_access_token_by_refresh_token,
-        OAuthResponse,
-    },
+    oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token, OAuthResponse},
     repository::{
         self,
         models::{OAuthToken, OAuthTokenUpdate},
@@ -21,7 +18,7 @@ struct Args {
     test: Option<String>,
 }
 
-pub async fn wait_for_command() {
+pub async fn run_command_loop_async() {
     let mut stdin_lines = io::stdin().lock().lines();
 
     while let Some(line) = stdin_lines.next() {
@@ -33,18 +30,9 @@ pub async fn wait_for_command() {
                 println!("Input: {}", input);
 
                 match input.as_str() {
-                    "token" => {
-                        handle_command_token();
-                        continue;
-                    }
-                    "refresh" => {
-                        handle_command_refresh().await;
-                        continue;
-                    }
-                    "event" => {
-                        handle_command_event().await;
-                        continue;
-                    }
+                    "token" => handle_command_token(),
+                    "refresh" => handle_command_refresh().await,
+                    "event" => handle_command_event().await,
                     _ => {}
                 }
             }
@@ -77,7 +65,7 @@ async fn handle_command_refresh() {
 
     match refresh_token {
         Some(refresh_token) => {
-            update_token(id, refresh_token).await;
+            refresh_and_save_token(id, refresh_token).await;
         }
         None => {
             println!("Refresh token is not found");
@@ -99,7 +87,7 @@ async fn handle_command_event() {
                     ..
                 }) = token.clone()
                 {
-                    let _ = update_token(token.clone().unwrap().id, refresh_token).await;
+                    let _ = refresh_and_save_token(token.clone().unwrap().id, refresh_token).await;
                     let token = repository::oauth_token::find_latest().unwrap();
                     update_events(token.unwrap()).await
                 } else {
@@ -111,29 +99,6 @@ async fn handle_command_event() {
         }
         Err(e) => {
             eprintln!("Error occurred when getting latest token: {:?}", e);
-        }
-    }
-}
-
-async fn update_token(id: String, refresh_token: String) {
-    let result = request_access_token_by_refresh_token(refresh_token).await;
-
-    let oauth_token_response = OAuthResponse::parse(&result.unwrap());
-    match oauth_token_response {
-        Ok(response) => {
-            let token_update = OAuthTokenUpdate {
-                access_token: Some(response.access_token),
-                expires_in: Some(response.expires_in.to_string()),
-                refresh_token: response.refresh_token,
-                scope: Some(response.scope),
-                token_type: Some(response.token_type),
-                updated_at: chrono::Local::now().to_rfc3339(),
-            };
-            let _ = repository::oauth_token::update(id, token_update);
-            println!("Success to get token! by refresh token");
-        }
-        Err(e) => {
-            println!("Recv error: {:?}", e.to_string());
         }
     }
 }
@@ -161,7 +126,7 @@ async fn update_events(token: OAuthToken) {
         }
         Err(google_calendar::Error::Unauthorized) => match refresh_token {
             Some(refresh_token) => {
-                update_token(id, refresh_token).await;
+                refresh_and_save_token(id, refresh_token).await;
             }
             None => {
                 println!("Refresh token is not found");

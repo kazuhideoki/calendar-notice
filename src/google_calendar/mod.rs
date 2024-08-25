@@ -7,7 +7,12 @@ use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
 use crate::{
     google_calendar::{self},
-    repository::{self, models::Event},
+    oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
+    repository::{
+        self,
+        models::{Event, OAuthToken},
+        oauth_token,
+    },
 };
 use serde::{Deserialize, Serialize};
 
@@ -213,7 +218,7 @@ impl From<InvalidHeaderValue> for Error {
 
 const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 
-pub fn run_sync_calendar_cron_thread() {
+pub fn spawn_sync_calendar_cron() {
     tokio::spawn(async {
         loop {
             let latest_token = repository::oauth_token::find_latest().unwrap_or_else(|e| {
@@ -222,60 +227,24 @@ pub fn run_sync_calendar_cron_thread() {
                     e
                 )
             });
-            // TODO 期限切れチェック
+
             match latest_token {
-                Some(oauth_token) => {
-                    let events = google_calendar::list_events(oauth_token.access_token).await.expect(
-                  "Failed to get events from Google Calendar. Please check your network connection.");
+                Some(oauth_token) if is_token_expired(&oauth_token, chrono::Local::now()) => {
+                    refresh_and_save_token(
+                        oauth_token.id.clone(),
+                        oauth_token.refresh_token.clone().unwrap(),
+                    )
+                    .await;
 
-                    let now = chrono::Local::now();
-                    let from = now - chrono::Duration::minutes(10);
-                    let to = now + chrono::Duration::days(3);
-                    let existing_events =
-                        repository::event::find_many(repository::models::EventFindMany {
-                            from: from.to_rfc3339(),
-                            to: to.to_rfc3339(),
-                        })
-                        .unwrap_or(vec![]);
+                    let new_token = repository::oauth_token::find_latest().unwrap();
 
-                    let new_events = events
-                        .items
-                        .iter()
-                        .filter(|event| {
-                            existing_events
-                                .iter()
-                                .find(|existing| existing.id == event.id)
-                                .is_none()
-                        })
-                        .collect::<Vec<_>>();
-
-                    let event_creates: Vec<Event> = new_events
-                        .iter()
-                        .map(|event| Event {
-                            id: event.id.clone(),
-                            summary: event.summary.clone(),
-                            description: event.description.clone(),
-                            status: Some(
-                                event
-                                    .status
-                                    .as_ref()
-                                    .unwrap_or(&EventStatus::Unknown)
-                                    .to_string(),
-                            ),
-                            start_datetime: event.start.date_time.clone().unwrap(),
-                            end_datetime: event.end.date_time.clone().unwrap(),
-                        })
-                        .collect();
-
-                    println!("New events: {:?}", event_creates);
-                    repository::event::create_many(event_creates)
-                        .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
+                    handle_sync_events(oauth_token).await
                 }
+                Some(oauth_token) => handle_sync_events(oauth_token).await,
                 None => {
-                    // TODO token 切れチェック
-                    // TODO Unauthorized が返ってきたら再認証する
-                    println!("OAuth token is not found. Please authenticate again.");
-                    return;
+                    println!("OAuth token is not found. Please authenticate ");
+                    // TODO 認証完了まで、次のループで再度認証最速が発生するのを防ぐ
+                    oauth::to_oauth_on_browser();
                 }
             }
 
@@ -284,6 +253,53 @@ pub fn run_sync_calendar_cron_thread() {
     });
 }
 
+async fn handle_sync_events(oauth_token: OAuthToken) {
+    let events = google_calendar::list_events(oauth_token.access_token)
+        .await
+        .expect("Failed to get events from Google Calendar. Please check your network connection.");
+
+    let now = chrono::Local::now();
+    let from = now - chrono::Duration::minutes(10);
+    let to = now + chrono::Duration::days(3);
+    let existing_events = repository::event::find_many(repository::models::EventFindMany {
+        from: from.to_rfc3339(),
+        to: to.to_rfc3339(),
+    })
+    .unwrap_or(vec![]);
+
+    let new_events = events
+        .items
+        .iter()
+        .filter(|event| {
+            existing_events
+                .iter()
+                .find(|existing| existing.id == event.id)
+                .is_none()
+        })
+        .collect::<Vec<_>>();
+
+    let event_creates: Vec<Event> = new_events
+        .iter()
+        .map(|event| Event {
+            id: event.id.clone(),
+            summary: event.summary.clone(),
+            description: event.description.clone(),
+            status: Some(
+                event
+                    .status
+                    .as_ref()
+                    .unwrap_or(&EventStatus::Unknown)
+                    .to_string(),
+            ),
+            start_datetime: event.start.date_time.clone().unwrap(),
+            end_datetime: event.end.date_time.clone().unwrap(),
+        })
+        .collect();
+
+    println!("New events: {:?}", event_creates);
+    repository::event::create_many(event_creates)
+        .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
+}
 // TODO 期間をクエリパラメータで指定できるようにする
 pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> {
     let url = format!(
