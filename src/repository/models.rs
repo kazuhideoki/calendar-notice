@@ -1,3 +1,4 @@
+use chrono::{DateTime, TimeZone};
 use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -12,9 +13,15 @@ pub struct Event {
     pub id: String,
     pub summary: String,
     pub description: Option<String>,
+    // TODO enum にできるか？
     pub status: Option<String>,
     pub start_datetime: String,
     pub end_datetime: String,
+}
+
+pub struct EventFindMany {
+    pub from: String,
+    pub to: String,
 }
 
 #[derive(

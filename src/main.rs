@@ -9,6 +9,7 @@ mod repository;
 mod schema;
 
 use command_line as cmd;
+use google_calendar::run_sync_calendar_cron_thread;
 use notification::run_notification_cron_thread;
 use oauth::is_token_expired::is_token_expired;
 
@@ -23,13 +24,7 @@ use oauth::is_token_expired::is_token_expired;
 */
 #[tokio::main]
 async fn main() {
-    // join 時のサンプル
-    // let results: Vec<(Event, Notification)> = events::table
-    //     .inner_join(notifications::table)
-    //     .select((Event::as_select(), Notification::as_select()))
-    //     .load(&mut conn)
-    //     .expect("Error loading events");
-    // println! {"{:?}", results};n
+    oauth::run_redirect_server();
 
     let latest_token = repository::oauth_token::find_latest().unwrap();
     if latest_token
@@ -39,8 +34,7 @@ async fn main() {
         oauth::to_oauth_on_browser();
     }
 
-    oauth::run_redirect_server();
-
+    run_sync_calendar_cron_thread();
     run_notification_cron_thread();
 
     cmd::wait_for_command().await;

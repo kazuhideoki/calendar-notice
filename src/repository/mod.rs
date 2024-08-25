@@ -1,18 +1,58 @@
+#![allow(unused_variables)]
 pub mod models;
 
-use diesel::{connection::SimpleConnection, Connection, SqliteConnection};
+use std::time::Duration;
+
+use diesel::{
+    connection::SimpleConnection,
+    r2d2::{ConnectionManager, Pool, PooledConnection},
+    SqliteConnection,
+};
 
 use crate::env::Env;
 
-fn get_connection() -> SqliteConnection {
+// 参考 https://stackoverflow.com/questions/57123453/how-to-use-diesel-with-sqlite-connections-and-avoid-database-is-locked-type-of
+#[derive(Debug)]
+pub struct ConnectionOptions {
+    pub enable_wal: bool,
+    pub enable_foreign_keys: bool,
+    pub busy_timeout: Option<Duration>,
+}
+
+impl diesel::r2d2::CustomizeConnection<SqliteConnection, diesel::r2d2::Error>
+    for ConnectionOptions
+{
+    fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
+        (|| {
+            if self.enable_wal {
+                conn.batch_execute("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
+            }
+            if self.enable_foreign_keys {
+                conn.batch_execute("PRAGMA foreign_keys = ON;")?;
+            }
+            if let Some(d) = self.busy_timeout {
+                conn.batch_execute(&format!("PRAGMA busy_timeout = {};", d.as_millis()))?;
+            }
+            Ok(())
+        })()
+        .map_err(diesel::r2d2::Error::QueryError)
+    }
+}
+
+fn get_connection() -> PooledConnection<ConnectionManager<SqliteConnection>> {
     let database_url = Env::new().database_url;
-    let mut conn = SqliteConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url));
 
-    conn.batch_execute("PRAGMA foreign_keys = ON")
-        .expect("Failed to enable foreign keys");
+    let pool = Pool::builder()
+        .max_size(16)
+        .connection_customizer(Box::new(ConnectionOptions {
+            enable_wal: true,
+            enable_foreign_keys: true,
+            busy_timeout: Some(Duration::from_secs(30)),
+        }))
+        .build(ConnectionManager::<SqliteConnection>::new(database_url))
+        .unwrap();
 
-    conn
+    pool.get().unwrap()
 }
 
 pub mod oauth_token {
@@ -57,5 +97,40 @@ pub mod oauth_token {
             Some(result) => Ok(Some(result)),
             None => Ok(None),
         }
+    }
+}
+
+pub mod event {
+    use chrono::TimeZone;
+    use diesel::{query_dsl::methods::FilterDsl, result, ExpressionMethods, RunQueryDsl};
+
+    use crate::schema::events;
+
+    use super::models::{Event, EventFindMany};
+
+    pub fn find_many(query: EventFindMany) -> Result<Vec<Event>, result::Error> {
+        events::table
+            .filter(events::start_datetime.ge(query.from))
+            .filter(events::end_datetime.le(query.to))
+            .load(&mut super::get_connection())
+    }
+
+    pub fn create_many(event: Vec<Event>) -> Result<(), std::io::Error> {
+        let result = diesel::insert_into(events::table)
+            .values(&event)
+            .execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+
+    pub fn update() {
+        todo!()
+    }
+    pub fn delete() {
+        todo!()
     }
 }

@@ -1,30 +1,22 @@
-use crate::google_calendar;
+use crate::repository::models::Event;
 
 use super::NOTIFICATION_INTERVAL_SEC;
 
-pub async fn filter_upcoming_events(
-    events: google_calendar::CalendarEvents,
-) -> Vec<google_calendar::Event> {
+/**
+ * TODO 固定時間ではなく、notification の 通知時間を読み込むロジックに変更
+ */
+pub async fn filter_upcoming_events(events: Vec<Event>) -> Vec<Event> {
     let now = chrono::Local::now();
-    let upcoming_events: Vec<google_calendar::Event> = events
-        .items
+    let upcoming_events: Vec<Event> = events
         .into_iter()
-        .filter(|item| filter_by_start_time(item, now))
+        .filter(|event| filter_by_start_time(event, now))
         .collect();
 
     upcoming_events
 }
 
-fn filter_by_start_time(
-    item: &google_calendar::Event,
-    now: chrono::DateTime<chrono::Local>,
-) -> bool {
-    let start_time = item
-        .start
-        .date_time
-        .as_ref()
-        .map(String::as_str)
-        .unwrap_or_else(|| "2099-01-01T00:00:00.000Z");
+fn filter_by_start_time(event: &Event, now: chrono::DateTime<chrono::Local>) -> bool {
+    let start_time = event.start_datetime.as_str();
     let start_time = chrono::DateTime::parse_from_rfc3339(start_time).unwrap();
     start_time.signed_duration_since(now).num_seconds() < NOTIFICATION_INTERVAL_SEC.into()
 }
@@ -51,9 +43,9 @@ mod tests {
         }
     }
 
-    impl From<TestEvent> for google_calendar::Event {
+    impl From<TestEvent> for google_calendar::CalendarEvent {
         fn from(test_event: TestEvent) -> Self {
-            google_calendar::Event {
+            google_calendar::CalendarEvent {
                 start: test_event.start,
                 ..Default::default()
             }

@@ -1,13 +1,9 @@
 #![allow(unused_variables)]
-use std::{process::Command, thread, time::Duration};
+use std::process::Command;
 
-use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 use filter_upcoming_events::filter_upcoming_events;
 
-use crate::{
-    google_calendar, repository,
-    schema::oauth_tokens::{self},
-};
+use crate::repository::{self};
 mod filter_upcoming_events;
 
 const NOTIFICATION_INTERVAL_SEC: u16 = 60 * 10;
@@ -15,13 +11,13 @@ const NOTIFICATION_INTERVAL_SEC: u16 = 60 * 10;
 pub fn run_notification_cron_thread() {
     tokio::spawn(async {
         loop {
-            let latest_token = repository::oauth_token::find_latest().unwrap();
-            match latest_token {
-                Some(oauth_token) => {
-                    let events = google_calendar::list_events(oauth_token.access_token).await.expect(
-                    "Failed to get events from Google Calendar. Please check your network connection.",
-                );
+            let events = repository::event::find_many(repository::models::EventFindMany {
+                from: chrono::Local::now().to_rfc3339(),
+                to: (chrono::Local::now() + chrono::Duration::days(1)).to_rfc3339(),
+            });
 
+            match events {
+                Ok(events) => {
                     let upcoming_events = filter_upcoming_events(events).await;
                     if upcoming_events.len() > 0 {
                         let event_names = upcoming_events
@@ -34,15 +30,8 @@ pub fn run_notification_cron_thread() {
                         notify();
                     }
                 }
-                None => {
-                    // TODO token 切れチェック
-                    // TODO Unauthorized が返ってきたら再認証する
-                    println!("OAuth token is not found. Please authenticate again.");
-                    return;
-                }
+                Err(e) => println!("Failed to get events: {:?}", e),
             }
-
-            thread::sleep(Duration::from_secs(NOTIFICATION_INTERVAL_SEC.into()));
         }
     });
 }

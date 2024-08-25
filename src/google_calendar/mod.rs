@@ -1,13 +1,18 @@
 #![allow(unused_variables)]
-use chrono::Days;
+use std::thread;
+use std::time::Duration;
+
+use chrono::{DateTime, Days, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
+use crate::{
+    google_calendar::{self},
+    repository::{self, models::Event},
+};
 use serde::{Deserialize, Serialize};
 
-use crate::oauth::OAuthResponse;
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CalendarEvents {
+pub struct CalendarParent {
     pub kind: String,
     pub etag: String,
     pub summary: String,
@@ -17,7 +22,7 @@ pub struct CalendarEvents {
     pub access_role: Option<String>,
     pub default_reminders: Option<Vec<Reminder>>,
     pub next_page_token: Option<String>,
-    pub items: Vec<Event>,
+    pub items: Vec<CalendarEvent>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,6 +40,16 @@ pub enum EventStatus {
     #[serde(other)]
     Unknown,
 }
+impl EventStatus {
+    pub fn to_string(&self) -> String {
+        match self {
+            EventStatus::Confirmed => "confirmed".to_string(),
+            EventStatus::Tentative => "tentative".to_string(),
+            EventStatus::Cancelled => "cancelled".to_string(),
+            EventStatus::Unknown => "unknown".to_string(),
+        }
+    }
+}
 
 /**
  * TODO model と融合？
@@ -44,7 +59,7 @@ pub enum EventStatus {
  * TODO 不要な値を削る
  */
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Event {
+pub struct CalendarEvent {
     pub kind: String,
     pub etag: String,
     pub id: String,
@@ -70,7 +85,7 @@ pub struct Event {
     pub hangout_link: Option<String>,
     pub conference_data: Option<ConferenceData>,
 }
-impl Default for Event {
+impl Default for CalendarEvent {
     fn default() -> Self {
         Self {
             kind: String::new(),
@@ -196,7 +211,75 @@ impl From<InvalidHeaderValue> for Error {
     }
 }
 
-pub async fn list_events(access_token: String) -> Result<CalendarEvents, Error> {
+const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
+
+pub fn run_sync_calendar_cron_thread() {
+    tokio::spawn(async {
+        loop {
+            let latest_token = repository::oauth_token::find_latest().unwrap();
+            match latest_token {
+                Some(oauth_token) => {
+                    let events = google_calendar::list_events(oauth_token.access_token).await.expect(
+                  "Failed to get events from Google Calendar. Please check your network connection.");
+
+                    let now = chrono::Local::now();
+                    let from = now - chrono::Duration::minutes(10);
+                    let to = now + chrono::Duration::days(3);
+                    let existing_events =
+                        repository::event::find_many(repository::models::EventFindMany {
+                            from: from.to_rfc3339(),
+                            to: to.to_rfc3339(),
+                        })
+                        .unwrap_or(vec![]);
+
+                    let new_events = events
+                        .items
+                        .iter()
+                        .filter(|event| {
+                            existing_events
+                                .iter()
+                                .find(|existing| existing.id == event.id)
+                                .is_none()
+                        })
+                        .collect::<Vec<_>>();
+
+                    let event_creates: Vec<Event> = new_events
+                        .iter()
+                        .map(|event| Event {
+                            id: event.id.clone(),
+                            summary: event.summary.clone(),
+                            description: event.description.clone(),
+                            status: Some(
+                                event
+                                    .status
+                                    .as_ref()
+                                    .unwrap_or(&EventStatus::Unknown)
+                                    .to_string(),
+                            ),
+                            start_datetime: event.start.date_time.clone().unwrap(),
+                            end_datetime: event.end.date_time.clone().unwrap(),
+                        })
+                        .collect();
+
+                    println!("New events: {:?}", event_creates);
+                    repository::event::create_many(event_creates)
+                        .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
+                }
+                None => {
+                    // TODO token 切れチェック
+                    // TODO Unauthorized が返ってきたら再認証する
+                    println!("OAuth token is not found. Please authenticate again.");
+                    return;
+                }
+            }
+
+            thread::sleep(Duration::from_secs(SYNC_CALENDAR_INTERVAL_SEC.into()));
+        }
+    });
+}
+
+// TODO 期間をクエリパラメータで指定できるようにする
+pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> {
     let url = format!(
         "https://www.googleapis.com/calendar/v3/calendars/{}/events",
         "primary"
@@ -235,7 +318,7 @@ pub async fn list_events(access_token: String) -> Result<CalendarEvents, Error> 
     }
 
     let text = response.text().await?;
-    let events: CalendarEvents =
+    let events: CalendarParent =
         serde_json::from_str(&text).map_err(|e| Error::Parse(e.to_string()))?;
     Ok(events)
 }
