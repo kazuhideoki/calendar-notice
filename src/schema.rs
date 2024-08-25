@@ -15,7 +15,7 @@ diesel::table! {
     notifications (event_id) {
         event_id -> Text,
         enabled -> Bool,
-        notification_time_from_start -> Integer,
+        notification_sec_from_start -> Integer,
     }
 }
 

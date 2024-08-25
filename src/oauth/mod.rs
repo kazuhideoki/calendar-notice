@@ -2,6 +2,7 @@
 pub mod is_token_expired;
 mod oauth_secret;
 
+use diesel::r2d2::event;
 use rand::{distributions::Alphanumeric, Rng};
 use std::collections::HashMap;
 use warp::Filter;
@@ -9,8 +10,12 @@ use warp::Filter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    google_calendar::{self, EventStatus},
     oauth::oauth_secret::OAuthSecret,
-    repository::{self, models::OAuthToken},
+    repository::{
+        self,
+        models::{Event, OAuthToken},
+    },
 };
 
 const PORT: u16 = 8990;
@@ -82,6 +87,45 @@ async fn handle_oauth_redirect(
                 };
                 let _ = repository::oauth_token::create(oauth_token);
                 println!("Success to get token!");
+
+                let events = google_calendar::list_events(response.access_token).await;
+                match events {
+                    Ok(events) => {
+                        println!("Initial success to get Google Calendar events!");
+
+                        let event_creates: Vec<Event> = events
+                            .items
+                            .iter()
+                            .map(|event| Event {
+                                id: event.id.clone(),
+                                summary: event.summary.clone(),
+                                description: event.description.clone(),
+                                status: Some(
+                                    event
+                                        .status
+                                        .as_ref()
+                                        .unwrap_or(&EventStatus::Unknown)
+                                        .to_string(),
+                                ),
+                                start_datetime: event.start.date_time.clone().unwrap(),
+                                end_datetime: event.end.date_time.clone().unwrap(),
+                            })
+                            .collect();
+                        let result = repository::event::create_many(event_creates);
+
+                        match result {
+                            Ok(_) => {
+                                println!("Success to save Google Calendar events!");
+                            }
+                            Err(e) => {
+                                println!("Failed to save Google Calendar events: {:?}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to get Google Calendar events: {:?}", e);
+                    }
+                }
             }
             Err(e) => {
                 println!("Recv error: {:?}", e.to_string());

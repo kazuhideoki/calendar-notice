@@ -2,7 +2,7 @@
 CREATE TABLE notifications (
   event_id TEXT PRIMARY KEY NOT NULL,
   enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  notification_time_from_start INTEGER NOT NULL,
+  notification_sec_from_start INTEGER NOT NULL,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
 );
 

@@ -15,12 +15,12 @@ use oauth::is_token_expired::is_token_expired;
 
 /**
   TODO
-  - カレンダー
-    - db に通知設定とともに保存
-    - 表示は DB 参照
+  - カレンダーを db に通知設定とともに保存
+    -
   - 通知
     - 通知設定を参照して通知
     - 通知設定の表示
+  - reporitory 整理
 */
 #[tokio::main]
 async fn main() {

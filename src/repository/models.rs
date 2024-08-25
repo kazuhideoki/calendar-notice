@@ -61,7 +61,7 @@ pub struct EventFindMany {
 pub struct Notification {
     pub event_id: String,
     pub enabled: bool,
-    pub notification_time_from_start: i32,
+    pub notification_sec_from_start: i32,
 }
 
 #[derive(

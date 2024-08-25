@@ -216,7 +216,13 @@ const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 pub fn run_sync_calendar_cron_thread() {
     tokio::spawn(async {
         loop {
-            let latest_token = repository::oauth_token::find_latest().unwrap();
+            let latest_token = repository::oauth_token::find_latest().unwrap_or_else(|e| {
+                panic!(
+                    "Failed to get latest token in run_sync_calendar_cron_thread: {:?}",
+                    e
+                )
+            });
+            // TODO 期限切れチェック
             match latest_token {
                 Some(oauth_token) => {
                     let events = google_calendar::list_events(oauth_token.access_token).await.expect(
