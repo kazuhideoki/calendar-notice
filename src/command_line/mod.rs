@@ -1,15 +1,13 @@
 #![allow(unused_variables)]
-use chrono::format;
 use clap::Parser;
-use core::sync;
-use std::io::{self, BufRead, Error};
+use std::io::{self, BufRead};
 
 use crate::{
-    google_calendar::{self, sync_events, update_events},
-    oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token, OAuthResponse},
+    google_calendar::sync_events,
+    oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
-        models::{EventFindMany, OAuthToken, OAuthTokenUpdate},
+        models::{EventFindMany, OAuthToken},
     },
 };
 

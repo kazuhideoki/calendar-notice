@@ -14,11 +14,17 @@ use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;
 
 /**
-  TODO
+  機能追加
   - 通知
-    - 通知設定の更新 (オンオフ、notification_sec_from_start)
+    - 通知設定の更新 オンオフ
     - 筋の良い通知方法
-  - 各ファイルの エラーハンドリング
+
+  Improve
+  - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
+  - module整理 + テスト追加
+  - 一部 env に逃がすか？
+  - Clippy(リンター) の導入
+  - doc つくる
 */
 #[tokio::main]
 async fn main() {

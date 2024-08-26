@@ -113,22 +113,11 @@ pub mod event {
 }
 
 pub mod notification {
-    use diesel::{query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl};
+    use diesel::{QueryDsl, RunQueryDsl};
 
     use crate::schema::notifications;
 
-    use super::models::{Notification, NotificationFindMany, NotificationUpdate};
-
-    pub fn find_many(query: NotificationFindMany) -> Result<Vec<Notification>, result::Error> {
-        let mut query_builder = notifications::table.into_boxed();
-
-        if let Some(event_ids_in) = query.event_ids_in {
-            query_builder =
-                FilterDsl::filter(query_builder, notifications::event_id.eq_any(event_ids_in));
-        }
-
-        query_builder.load(&mut super::get_connection())
-    }
+    use super::models::{Notification, NotificationUpdate};
 
     pub fn create_many(notifications: Vec<Notification>) -> Result<(), std::io::Error> {
         let result = diesel::insert_into(notifications::table)

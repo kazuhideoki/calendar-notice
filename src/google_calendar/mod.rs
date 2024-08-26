@@ -1,9 +1,7 @@
 #![allow(unused_variables)]
+use std::thread;
 use std::time::Duration;
-use std::{ops::Not, thread};
 
-use chrono::{DateTime, Days, Utc};
-use diesel::result;
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
 use crate::{
@@ -12,7 +10,6 @@ use crate::{
     repository::{
         self,
         models::{Event, EventFindMany, EventUpdate, Notification, OAuthToken},
-        oauth_token,
     },
 };
 use serde::{Deserialize, Serialize};

@@ -2,7 +2,6 @@
 pub mod is_token_expired;
 mod oauth_secret;
 
-use diesel::r2d2::event;
 use rand::{distributions::Alphanumeric, Rng};
 use std::{collections::HashMap, thread, time::Duration};
 use warp::Filter;
@@ -10,11 +9,11 @@ use warp::Filter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    google_calendar::{self, sync_events, EventStatus},
+    google_calendar::sync_events,
     oauth::oauth_secret::OAuthSecret,
     repository::{
         self,
-        models::{Event, OAuthToken, OAuthTokenUpdate},
+        models::{OAuthToken, OAuthTokenUpdate},
     },
 };
 
