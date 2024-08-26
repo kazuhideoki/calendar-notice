@@ -111,13 +111,13 @@ async fn update_events(token: OAuthToken) {
         ..
     } = token;
 
-    let result = google_calendar::list_events(access_token).await;
+    let google_calendar_result = google_calendar::list_events(access_token).await;
 
-    match result {
-        Ok(events) => {
+    match google_calendar_result {
+        Ok(google_calendar_parent) => {
             println!(
                 "{:?}",
-                events
+                google_calendar_parent
                     .items
                     .iter()
                     .map(|item| &item.summary)

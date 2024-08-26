@@ -17,6 +17,7 @@ use crate::schema::{events, notifications, oauth_tokens};
 )]
 #[diesel(table_name = events)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+// TODO createdAt 追加
 pub struct Event {
     pub id: String,
     pub summary: String,
@@ -40,8 +41,22 @@ impl Default for Event {
 }
 
 pub struct EventFindMany {
-    pub from: String,
-    pub to: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub ids_in: Option<Vec<String>>,
+}
+impl Default for EventFindMany {
+    fn default() -> Self {
+        EventFindMany {
+            from: None,
+            to: None,
+            ids_in: None,
+        }
+    }
+}
+
+pub struct EventDeleteMany {
+    pub ids_in: Vec<String>,
 }
 
 #[derive(

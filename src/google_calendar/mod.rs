@@ -10,14 +10,14 @@ use crate::{
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
-        models::{Event, OAuthToken},
+        models::{Event, EventDeleteMany, EventFindMany, OAuthToken},
         oauth_token,
     },
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CalendarParent {
+pub struct GoogleCalendarParent {
     pub kind: String,
     pub etag: String,
     pub summary: String,
@@ -27,7 +27,7 @@ pub struct CalendarParent {
     pub access_role: Option<String>,
     pub default_reminders: Option<Vec<Reminder>>,
     pub next_page_token: Option<String>,
-    pub items: Vec<CalendarEvent>,
+    pub items: Vec<GoogleCalendarEvent>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ impl EventStatus {
  * TODO 不要な値を削る
  */
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CalendarEvent {
+pub struct GoogleCalendarEvent {
     pub kind: String,
     pub etag: String,
     pub id: String,
@@ -90,7 +90,7 @@ pub struct CalendarEvent {
     pub hangout_link: Option<String>,
     pub conference_data: Option<ConferenceData>,
 }
-impl Default for CalendarEvent {
+impl Default for GoogleCalendarEvent {
     fn default() -> Self {
         Self {
             kind: String::new(),
@@ -218,7 +218,7 @@ impl From<InvalidHeaderValue> for Error {
 
 const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 // TODO 扱う期間を const or env 化
-const FROM_SUB_MIN: u8 = 10;
+const FROM_SUB_SEC: u16 = 60 * 10;
 const TO_ADD_DAYS: u8 = 3;
 
 pub fn spawn_sync_calendar_cron() {
@@ -239,14 +239,15 @@ pub fn spawn_sync_calendar_cron() {
                     )
                     .await;
 
-                    let new_token = repository::oauth_token::find_latest().unwrap();
+                    let new_token =
+                        repository::oauth_token::find_latest().expect("new token must be found");
 
                     handle_sync_events(oauth_token).await
                 }
                 Some(oauth_token) => handle_sync_events(oauth_token).await,
                 None => {
                     println!("OAuth token is not found. Please authenticate ");
-                    // TODO 認証完了まで、次のループで再度認証最速が発生するのを防ぐ
+                    // TODO 認証完了まで、次のループで再度認証催促が発生するのを防ぐ
                     oauth::to_oauth_on_browser();
                 }
             }
@@ -257,30 +258,42 @@ pub fn spawn_sync_calendar_cron() {
 }
 
 async fn handle_sync_events(oauth_token: OAuthToken) {
-    let events_result = google_calendar::list_events(oauth_token.access_token).await;
+    let google_calendar_result = google_calendar::list_events(oauth_token.access_token).await;
 
-    match events_result {
-        Ok(events) => {
+    // TODO
+    // 過去のダブりは update
+    // 未来のものも update
+    match google_calendar_result {
+        Ok(google_calendar_parent) => {
             let now = chrono::Local::now();
-            let existing_events = repository::event::find_many(repository::models::EventFindMany {
-                from: (now - chrono::Duration::minutes(FROM_SUB_MIN.into())).to_rfc3339(),
-                to: (now + chrono::Duration::days(TO_ADD_DAYS.into())).to_rfc3339(),
-            })
-            .unwrap_or(vec![]);
 
-            // TODO 新しいではなく、変更があったイベントを更新する -> delete & insert で対応
-            let new_events = events
-                .items
-                .iter()
-                .filter(|event| {
-                    existing_events
+            let existing_events = repository::event::find_many(EventFindMany {
+                ids_in: Some(
+                    google_calendar_parent
+                        .items
                         .iter()
-                        .find(|existing| existing.id == event.id)
-                        .is_none()
-                })
-                .collect::<Vec<_>>();
+                        .map(|event| event.id.clone())
+                        .collect(),
+                ),
+                ..Default::default()
+            })
+            .unwrap_or_else(|e| {
+                println!(
+                    "Failed to get upcoming events in handle_sync_events: {:?}",
+                    e
+                );
+                vec![]
+            });
 
-            let event_creates: Vec<Event> = new_events
+            let _ = repository::event::delete_many(EventDeleteMany {
+                ids_in: existing_events
+                    .iter()
+                    .map(|event| event.id.clone())
+                    .collect(),
+            });
+
+            let event_creates: Vec<Event> = google_calendar_parent
+                .items
                 .iter()
                 .map(|event| Event {
                     id: event.id.clone(),
@@ -299,10 +312,18 @@ async fn handle_sync_events(oauth_token: OAuthToken) {
                 .collect();
 
             println!("New events: {:?}", event_creates);
+
+            // TODO 存在してないなら、新しいものを追加する
+
             repository::event::create_many(event_creates)
                 .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
         }
         Err(e) => {
+            // TODO Unauthorized 時処理
+            /**
+             * 1. refresh_and_save_token
+             * 2. handle_sync_events をもう一度やる形？
+             */
             println!(
                 "Failed to get events from Google Calendar in handle_sync_events: {:?}",
                 e
@@ -311,7 +332,7 @@ async fn handle_sync_events(oauth_token: OAuthToken) {
     }
 }
 // TODO 期間をクエリパラメータで指定できるようにする
-pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> {
+pub async fn list_events(access_token: String) -> Result<GoogleCalendarParent, Error> {
     let url = format!(
         "https://www.googleapis.com/calendar/v3/calendars/{}/events",
         "primary"
@@ -334,7 +355,7 @@ pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> 
             ("singleEvents", "true"),
             (
                 "timeMin",
-                &(now - chrono::Duration::minutes(FROM_SUB_MIN.into())).to_rfc3339(),
+                &(now - chrono::Duration::minutes(FROM_SUB_SEC.into())).to_rfc3339(),
             ),
             (
                 "timeMax",
@@ -349,7 +370,7 @@ pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> 
     }
 
     let text = response.text().await?;
-    let events: CalendarParent =
+    let events: GoogleCalendarParent =
         serde_json::from_str(&text).map_err(|e| Error::Parse(e.to_string()))?;
     Ok(events)
 }

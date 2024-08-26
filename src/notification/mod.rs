@@ -3,7 +3,7 @@ use std::process::Command;
 
 use filter_upcoming_events::filter_upcoming_events;
 
-use crate::repository::{self};
+use crate::repository::{self, models::EventFindMany};
 mod filter_upcoming_events;
 
 const NOTIFICATION_INTERVAL_SEC: u16 = 60;
@@ -11,9 +11,10 @@ const NOTIFICATION_INTERVAL_SEC: u16 = 60;
 pub fn spawn_notification_cron() {
     tokio::spawn(async {
         loop {
-            let events = repository::event::find_many(repository::models::EventFindMany {
-                from: chrono::Local::now().to_rfc3339(),
-                to: (chrono::Local::now() + chrono::Duration::days(1)).to_rfc3339(),
+            let events = repository::event::find_many(EventFindMany {
+                from: Some(chrono::Local::now().to_rfc3339()),
+                to: Some((chrono::Local::now() + chrono::Duration::days(1)).to_rfc3339()),
+                ..Default::default()
             });
 
             match events {
