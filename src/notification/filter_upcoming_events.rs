@@ -1,5 +1,8 @@
 #![allow(unused_variables)]
-use crate::repository::models::{Event, Notification};
+use crate::repository::{
+    models::{Event, Notification},
+    notification,
+};
 
 pub fn filter_upcoming_events(events: Vec<(Event, Notification)>) -> Vec<Event> {
     let now = chrono::Local::now();
@@ -17,6 +20,7 @@ fn filter_by_start_time(
         Event { start_datetime, .. },
         Notification {
             notification_sec_from_start,
+            enabled,
             ..
         },
     ): &(Event, Notification),
@@ -30,7 +34,7 @@ fn filter_by_start_time(
             )
         });
     let notification_sec_from_start = *notification_sec_from_start as i64;
-    start_time.signed_duration_since(now).num_seconds() < notification_sec_from_start
+    start_time.signed_duration_since(now).num_seconds() < notification_sec_from_start && *enabled
 }
 
 #[cfg(test)]
@@ -54,7 +58,8 @@ mod tests {
                 ..Default::default()
             },
             Notification {
-                notification_sec_from_start: duration.into(), // TODO 修正
+                notification_sec_from_start: duration.into(),
+                enabled: true,
                 ..Default::default()
             },
         );
@@ -64,14 +69,30 @@ mod tests {
         let event2 = (
             Event {
                 start_datetime: "2023-08-01T12:09:59+09:00".to_string(), // + duration - 1
+
                 ..Default::default()
             },
             Notification {
-                notification_sec_from_start: (duration).into(), // TODO 修正
+                notification_sec_from_start: (duration).into(),
+                enabled: true,
                 ..Default::default()
             },
         );
         let result2 = filter_by_start_time(&event2.into(), now);
         assert_eq!(result2, true);
+
+        let event3 = (
+            Event {
+                start_datetime: "2023-08-01T12:10:00+09:00".to_string(), // + NOTIFICATION_INTERVAL_SEC
+                ..Default::default()
+            },
+            Notification {
+                notification_sec_from_start: duration.into(),
+                enabled: false,
+                ..Default::default()
+            },
+        );
+        let result3 = filter_by_start_time(&event3, now);
+        assert_eq!(result3, false);
     }
 }

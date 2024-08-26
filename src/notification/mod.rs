@@ -3,7 +3,10 @@ use std::process::Command;
 
 use filter_upcoming_events::filter_upcoming_events;
 
-use crate::repository::{self, models::EventFindMany};
+use crate::repository::{
+    self,
+    models::{EventFindMany, NotificationUpdate},
+};
 mod filter_upcoming_events;
 
 const NOTIFICATION_INTERVAL_SEC: u16 = 60;
@@ -21,15 +24,17 @@ pub fn spawn_notification_cron() {
             match events {
                 Ok(events) => {
                     let upcoming_events = filter_upcoming_events(events);
-                    if upcoming_events.len() > 0 {
-                        let event_names = upcoming_events
-                            .iter()
-                            .map(|event| event.summary.clone())
-                            .collect::<Vec<String>>()
-                            .join(", ");
-                        println!("Upcoming events: {}", event_names);
-
+                    for event in upcoming_events {
                         notify();
+
+                        repository::notification::update(
+                            event.id.clone(),
+                            NotificationUpdate {
+                                enabled: Some(false),
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap_or_else(|e| println!("Failed to update notification: {}", e));
                     }
                 }
                 Err(e) => println!("Failed to get events: {:?}", e),

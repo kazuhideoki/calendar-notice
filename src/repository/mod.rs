@@ -117,7 +117,7 @@ pub mod notification {
 
     use crate::schema::notifications;
 
-    use super::models::{Notification, NotificationFindMany};
+    use super::models::{Notification, NotificationFindMany, NotificationUpdate};
 
     pub fn find_many(query: NotificationFindMany) -> Result<Vec<Notification>, result::Error> {
         let mut query_builder = notifications::table.into_boxed();
@@ -133,6 +133,21 @@ pub mod notification {
     pub fn create_many(notifications: Vec<Notification>) -> Result<(), std::io::Error> {
         let result = diesel::insert_into(notifications::table)
             .values(&notifications)
+            .execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+
+    pub fn update(
+        event_id: String,
+        notification_update: NotificationUpdate,
+    ) -> Result<(), std::io::Error> {
+        let result = diesel::update(notifications::table.find(event_id))
+            .set(&notification_update)
             .execute(&mut super::get_connection());
 
         match result {
@@ -170,11 +185,7 @@ pub mod oauth_token {
         match result {
             Ok(_) => Ok(()),
             // TODO エラー定義
-            // Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-            Err(e) => {
-                println!("Error occurred when updating oauth token: {:?}", e);
-                Err(std::io::Error::new(std::io::ErrorKind::Other, e))
-            }
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
         }
     }
 

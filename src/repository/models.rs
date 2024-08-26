@@ -110,6 +110,21 @@ impl Default for NotificationFindMany {
     }
 }
 
+#[derive(Queryable, AsChangeset)]
+#[diesel(table_name = notifications)]
+pub struct NotificationUpdate {
+    pub enabled: Option<bool>,
+    pub notification_sec_from_start: Option<i32>,
+}
+impl Default for NotificationUpdate {
+    fn default() -> Self {
+        NotificationUpdate {
+            enabled: None,
+            notification_sec_from_start: None,
+        }
+    }
+}
+
 #[derive(
     Debug,
     Queryable,

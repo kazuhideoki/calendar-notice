@@ -16,7 +16,6 @@ use oauth::spawn_redirect_server;
 /**
   TODO
   - 通知
-    - 通知設定の表示
     - 通知設定の更新 (オンオフ、notification_sec_from_start)
     - 筋の良い通知方法
   - 各ファイルの エラーハンドリング

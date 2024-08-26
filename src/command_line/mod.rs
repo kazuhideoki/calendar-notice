@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+use chrono::format;
 use clap::Parser;
 use core::sync;
 use std::io::{self, BufRead, Error};
@@ -125,13 +126,18 @@ async fn handle_list_notification() {
     println!("");
     println!("通知設定");
     for (event, notification) in events {
+        let notified = if notification.enabled {
+            format!("{}分前通知", notification.notification_sec_from_start / 60)
+        } else {
+            "通知なし".to_string()
+        };
         println!(
-            "{}: {}開始 {}分前通知",
+            "{}: {}開始 {}",
             event.summary,
             chrono::DateTime::parse_from_rfc3339(event.start_datetime.as_str())
                 .expect("Error occurred when parsing start time, handle_list_notification")
-                .format("-%m-%d %H:%M:%S"),
-            notification.notification_sec_from_start / 60
+                .format("%m-%d %H:%M"),
+            notified
         );
     }
 }
