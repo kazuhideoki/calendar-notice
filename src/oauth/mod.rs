@@ -4,13 +4,13 @@ mod oauth_secret;
 
 use diesel::r2d2::event;
 use rand::{distributions::Alphanumeric, Rng};
-use std::collections::HashMap;
+use std::{collections::HashMap, thread, time::Duration};
 use warp::Filter;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    google_calendar::{self, EventStatus},
+    google_calendar::{self, sync_events, EventStatus},
     oauth::oauth_secret::OAuthSecret,
     repository::{
         self,
@@ -51,6 +51,10 @@ impl From<reqwest::Error> for ReqwestError {
 }
 
 pub fn to_oauth_on_browser() {
+    println!("Open browser to get OAuth token...");
+
+    thread::sleep(Duration::from_secs(2));
+
     let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string");
 
     open::that(oauth_url).expect("Failed to open URL in browser");
@@ -85,47 +89,12 @@ async fn handle_oauth_redirect(
                     created_at: chrono::Local::now().to_rfc3339(),
                     updated_at: chrono::Local::now().to_rfc3339(),
                 };
-                let _ = repository::oauth_token::create(oauth_token);
+                let _ = repository::oauth_token::create(oauth_token.clone());
                 println!("Success to get token!");
 
-                let events = google_calendar::list_events(response.access_token).await;
-                match events {
-                    Ok(events) => {
-                        println!("Initial success to get Google Calendar events!");
-
-                        let event_creates: Vec<Event> = events
-                            .items
-                            .iter()
-                            .map(|event| Event {
-                                id: event.id.clone(),
-                                summary: event.summary.clone(),
-                                description: event.description.clone(),
-                                status: Some(
-                                    event
-                                        .status
-                                        .as_ref()
-                                        .unwrap_or(&EventStatus::Unknown)
-                                        .to_string(),
-                                ),
-                                start_datetime: event.start.date_time.clone().unwrap(),
-                                end_datetime: event.end.date_time.clone().unwrap(),
-                            })
-                            .collect();
-                        let result = repository::event::create_many(event_creates);
-
-                        match result {
-                            Ok(_) => {
-                                println!("Success to save Google Calendar events!");
-                            }
-                            Err(e) => {
-                                println!("Failed to save Google Calendar events: {:?}", e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        println!("Failed to get Google Calendar events: {:?}", e);
-                    }
-                }
+                sync_events(oauth_token).await.unwrap_or_else(|e| {
+                    println!("Failed to sync events in handle_oauth_redirect: {:?}", e);
+                });
             }
             Err(e) => {
                 println!("Recv error: {:?}", e.to_string());

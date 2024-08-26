@@ -15,10 +15,7 @@ use oauth::spawn_redirect_server;
 
 /**
   TODO
-  - イベントの正しい同期
-    - 変更になったイベントを正しく更新できているか？
   - 通知
-    - 通知設定をイベント同期と共に作成
     - 通知設定を参照して通知(notification_sec_from_start をもとに)
     - 通知設定の表示
     - 通知設定の更新 (オンオフ、notification_sec_from_start)
