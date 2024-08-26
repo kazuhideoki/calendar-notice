@@ -57,7 +57,7 @@ fn get_connection() -> PooledConnection<ConnectionManager<SqliteConnection>> {
 
 pub mod event {
     use diesel::{
-        query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl,
+        query_dsl::methods::FilterDsl, result, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
         SelectableHelper,
     };
 
@@ -67,8 +67,9 @@ pub mod event {
 
     pub fn find_many(query: EventFindMany) -> Result<Vec<(Event, Notification)>, result::Error> {
         let mut query_builder = events::table
-            .inner_join(notifications::table)
+            .inner_join(notifications::table.on(events::id.eq(notifications::event_id)))
             .select((Event::as_select(), Notification::as_select()))
+            .order(events::start_datetime.asc())
             .into_boxed();
 
         if let Some(from) = query.from {

@@ -14,7 +14,7 @@ pub fn spawn_notification_cron() {
             let now = chrono::Local::now();
             let events = repository::event::find_many(EventFindMany {
                 from: Some(now.to_rfc3339()),
-                to: Some((now + chrono::Duration::minutes(30)).to_rfc3339()),
+                to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
                 ..Default::default()
             });
 

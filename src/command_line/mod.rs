@@ -8,7 +8,7 @@ use crate::{
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token, OAuthResponse},
     repository::{
         self,
-        models::{OAuthToken, OAuthTokenUpdate},
+        models::{EventFindMany, OAuthToken, OAuthTokenUpdate},
     },
 };
 
@@ -34,6 +34,7 @@ pub async fn run_command_loop_async() {
                     "token" => handle_command_token(),
                     "refresh" => handle_command_refresh().await,
                     "sync" => handle_command_sync().await,
+                    "list" => handle_list_notification().await,
                     _ => {}
                 }
             }
@@ -109,5 +110,28 @@ async fn handle_command_sync() {
         Err(e) => {
             eprintln!("Error occurred when getting latest token: {:?}", e);
         }
+    }
+}
+
+async fn handle_list_notification() {
+    let now = chrono::Local::now();
+    let events = repository::event::find_many(EventFindMany {
+        from: Some(now.to_rfc3339()),
+        to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
+        ..Default::default()
+    })
+    .unwrap();
+
+    println!("");
+    println!("通知設定");
+    for (event, notification) in events {
+        println!(
+            "{}: {}開始 {}分前通知",
+            event.summary,
+            chrono::DateTime::parse_from_rfc3339(event.start_datetime.as_str())
+                .expect("Error occurred when parsing start time, handle_list_notification")
+                .format("-%m-%d %H:%M:%S"),
+            notification.notification_sec_from_start / 60
+        );
     }
 }
