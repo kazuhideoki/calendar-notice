@@ -85,6 +85,30 @@ pub struct Notification {
     pub enabled: bool,
     pub notification_sec_from_start: i32,
 }
+impl Default for Notification {
+    fn default() -> Self {
+        Notification {
+            event_id: uuid::Uuid::new_v4().to_string(),
+            enabled: true,
+            notification_sec_from_start: 60,
+        }
+    }
+}
+
+pub struct NotificationFindMany {
+    pub event_ids_in: Option<Vec<String>>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+impl Default for NotificationFindMany {
+    fn default() -> Self {
+        NotificationFindMany {
+            event_ids_in: None,
+            from: None,
+            to: None,
+        }
+    }
+}
 
 #[derive(
     Debug,

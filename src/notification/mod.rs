@@ -11,15 +11,16 @@ const NOTIFICATION_INTERVAL_SEC: u16 = 60;
 pub fn spawn_notification_cron() {
     tokio::spawn(async {
         loop {
+            let now = chrono::Local::now();
             let events = repository::event::find_many(EventFindMany {
-                from: Some(chrono::Local::now().to_rfc3339()),
-                to: Some((chrono::Local::now() + chrono::Duration::days(1)).to_rfc3339()),
+                from: Some(now.to_rfc3339()),
+                to: Some((now + chrono::Duration::minutes(30)).to_rfc3339()),
                 ..Default::default()
             });
 
             match events {
                 Ok(events) => {
-                    let upcoming_events = filter_upcoming_events(events).await;
+                    let upcoming_events = filter_upcoming_events(events);
                     if upcoming_events.len() > 0 {
                         let event_names = upcoming_events
                             .iter()

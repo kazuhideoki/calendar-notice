@@ -56,14 +56,20 @@ fn get_connection() -> PooledConnection<ConnectionManager<SqliteConnection>> {
 }
 
 pub mod event {
-    use diesel::{query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl};
+    use diesel::{
+        query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl,
+        SelectableHelper,
+    };
 
-    use crate::schema::events;
+    use crate::schema::{events, notifications};
 
-    use super::models::{Event, EventFindMany, EventUpdate};
+    use super::models::{Event, EventFindMany, EventUpdate, Notification};
 
-    pub fn find_many(query: EventFindMany) -> Result<Vec<Event>, result::Error> {
-        let mut query_builder = events::table.into_boxed();
+    pub fn find_many(query: EventFindMany) -> Result<Vec<(Event, Notification)>, result::Error> {
+        let mut query_builder = events::table
+            .inner_join(notifications::table)
+            .select((Event::as_select(), Notification::as_select()))
+            .into_boxed();
 
         if let Some(from) = query.from {
             query_builder = FilterDsl::filter(query_builder, events::start_datetime.ge(from));
@@ -106,11 +112,22 @@ pub mod event {
 }
 
 pub mod notification {
-    use diesel::RunQueryDsl;
+    use diesel::{query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl};
 
     use crate::schema::notifications;
 
-    use super::models::Notification;
+    use super::models::{Notification, NotificationFindMany};
+
+    pub fn find_many(query: NotificationFindMany) -> Result<Vec<Notification>, result::Error> {
+        let mut query_builder = notifications::table.into_boxed();
+
+        if let Some(event_ids_in) = query.event_ids_in {
+            query_builder =
+                FilterDsl::filter(query_builder, notifications::event_id.eq_any(event_ids_in));
+        }
+
+        query_builder.load(&mut super::get_connection())
+    }
 
     pub fn create_many(notifications: Vec<Notification>) -> Result<(), std::io::Error> {
         let result = diesel::insert_into(notifications::table)

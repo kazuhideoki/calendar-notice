@@ -333,7 +333,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
     });
 
     // すでに存在するイベントは、events を更新する
-    for event in &duplicated_events {
+    for (event, _) in &duplicated_events {
         let event_update: EventUpdate = google_calendar_parent
             .items
             .iter()
@@ -358,7 +358,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
     let new_google_calendar_events = google_calendar_parent.items.iter().filter(|event| {
         !duplicated_events
             .iter()
-            .any(|duplicated_event| duplicated_event.id == event.id)
+            .any(|duplicated_event| duplicated_event.0.id == event.id)
     });
 
     let event_creates: Vec<Event> = new_google_calendar_events
