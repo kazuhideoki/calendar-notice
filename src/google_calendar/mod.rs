@@ -217,6 +217,9 @@ impl From<InvalidHeaderValue> for Error {
 }
 
 const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
+// TODO 扱う期間を const or env 化
+const FROM_SUB_MIN: u8 = 10;
+const TO_ADD_DAYS: u8 = 3;
 
 pub fn spawn_sync_calendar_cron() {
     tokio::spawn(async {
@@ -254,51 +257,58 @@ pub fn spawn_sync_calendar_cron() {
 }
 
 async fn handle_sync_events(oauth_token: OAuthToken) {
-    let events = google_calendar::list_events(oauth_token.access_token)
-        .await
-        .expect("Failed to get events from Google Calendar. Please check your network connection.");
+    let events_result = google_calendar::list_events(oauth_token.access_token).await;
 
-    let now = chrono::Local::now();
-    let from = now - chrono::Duration::minutes(10);
-    let to = now + chrono::Duration::days(3);
-    let existing_events = repository::event::find_many(repository::models::EventFindMany {
-        from: from.to_rfc3339(),
-        to: to.to_rfc3339(),
-    })
-    .unwrap_or(vec![]);
+    match events_result {
+        Ok(events) => {
+            let now = chrono::Local::now();
+            let existing_events = repository::event::find_many(repository::models::EventFindMany {
+                from: (now - chrono::Duration::minutes(FROM_SUB_MIN.into())).to_rfc3339(),
+                to: (now + chrono::Duration::days(TO_ADD_DAYS.into())).to_rfc3339(),
+            })
+            .unwrap_or(vec![]);
 
-    let new_events = events
-        .items
-        .iter()
-        .filter(|event| {
-            existing_events
+            // TODO 新しいではなく、変更があったイベントを更新する -> delete & insert で対応
+            let new_events = events
+                .items
                 .iter()
-                .find(|existing| existing.id == event.id)
-                .is_none()
-        })
-        .collect::<Vec<_>>();
+                .filter(|event| {
+                    existing_events
+                        .iter()
+                        .find(|existing| existing.id == event.id)
+                        .is_none()
+                })
+                .collect::<Vec<_>>();
 
-    let event_creates: Vec<Event> = new_events
-        .iter()
-        .map(|event| Event {
-            id: event.id.clone(),
-            summary: event.summary.clone(),
-            description: event.description.clone(),
-            status: Some(
-                event
-                    .status
-                    .as_ref()
-                    .unwrap_or(&EventStatus::Unknown)
-                    .to_string(),
-            ),
-            start_datetime: event.start.date_time.clone().unwrap(),
-            end_datetime: event.end.date_time.clone().unwrap(),
-        })
-        .collect();
+            let event_creates: Vec<Event> = new_events
+                .iter()
+                .map(|event| Event {
+                    id: event.id.clone(),
+                    summary: event.summary.clone(),
+                    description: event.description.clone(),
+                    status: Some(
+                        event
+                            .status
+                            .as_ref()
+                            .unwrap_or(&EventStatus::Unknown)
+                            .to_string(),
+                    ),
+                    start_datetime: event.start.date_time.clone().unwrap(),
+                    end_datetime: event.end.date_time.clone().unwrap(),
+                })
+                .collect();
 
-    println!("New events: {:?}", event_creates);
-    repository::event::create_many(event_creates)
-        .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
+            println!("New events: {:?}", event_creates);
+            repository::event::create_many(event_creates)
+                .unwrap_or_else(|e| println!("Failed to create events: {:?}", e));
+        }
+        Err(e) => {
+            println!(
+                "Failed to get events from Google Calendar in handle_sync_events: {:?}",
+                e
+            );
+        }
+    }
 }
 // TODO 期間をクエリパラメータで指定できるようにする
 pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> {
@@ -313,6 +323,7 @@ pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> 
         HeaderValue::from_str(&format!("Bearer {}", access_token))?,
     );
 
+    let now = chrono::Utc::now();
     let client = reqwest::Client::new();
     let response = client
         .get(&url)
@@ -321,15 +332,13 @@ pub async fn list_events(access_token: String) -> Result<CalendarParent, Error> 
             ("maxResults", "10"),
             ("orderBy", "startTime"),
             ("singleEvents", "true"),
-            // ("timeMin", "2024-01-01T00:00:00Z"), // 開始日時を指定
-            // 今日から 3日間
-            ("timeMin", &chrono::Utc::now().to_rfc3339()),
+            (
+                "timeMin",
+                &(now - chrono::Duration::minutes(FROM_SUB_MIN.into())).to_rfc3339(),
+            ),
             (
                 "timeMax",
-                &chrono::Utc::now()
-                    .checked_add_days(Days::new(3))
-                    .expect("Failed to add days")
-                    .to_rfc3339(),
+                &(now + chrono::Duration::days(TO_ADD_DAYS.into())).to_rfc3339(),
             ),
         ])
         .send()

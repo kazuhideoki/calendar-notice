@@ -22,7 +22,6 @@ use oauth::spawn_redirect_server;
     - 通知設定を参照して通知(notification_sec_from_start をもとに)
     - 通知設定の表示
     - 通知設定の更新 (オンオフ、notification_sec_from_start)
-  - reporitory 整理
 */
 #[tokio::main]
 async fn main() {
