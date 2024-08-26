@@ -55,6 +55,76 @@ fn get_connection() -> PooledConnection<ConnectionManager<SqliteConnection>> {
     pool.get().unwrap()
 }
 
+pub mod event {
+    use diesel::{query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl};
+
+    use crate::schema::events;
+
+    use super::models::{Event, EventFindMany, EventUpdate};
+
+    pub fn find_many(query: EventFindMany) -> Result<Vec<Event>, result::Error> {
+        let mut query_builder = events::table.into_boxed();
+
+        if let Some(from) = query.from {
+            query_builder = FilterDsl::filter(query_builder, events::start_datetime.ge(from));
+        }
+
+        if let Some(to) = query.to {
+            query_builder = FilterDsl::filter(query_builder, events::end_datetime.le(to));
+        }
+
+        if let Some(ids_in) = query.ids_in {
+            query_builder = FilterDsl::filter(query_builder, events::id.eq_any(ids_in));
+        }
+
+        query_builder.load(&mut super::get_connection())
+    }
+
+    pub fn create_many(events: Vec<Event>) -> Result<(), std::io::Error> {
+        let result = diesel::insert_into(events::table)
+            .values(&events)
+            .execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+
+    pub fn update(id: String, event_update: EventUpdate) -> Result<(), std::io::Error> {
+        let result = diesel::update(events::table.find(id))
+            .set(&event_update)
+            .execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+}
+
+pub mod notification {
+    use diesel::RunQueryDsl;
+
+    use crate::schema::notifications;
+
+    use super::models::Notification;
+
+    pub fn create_many(notifications: Vec<Notification>) -> Result<(), std::io::Error> {
+        let result = diesel::insert_into(notifications::table)
+            .values(&notifications)
+            .execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
+}
+
 pub mod oauth_token {
     use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 
@@ -101,65 +171,5 @@ pub mod oauth_token {
             Some(result) => Ok(Some(result)),
             None => Ok(None),
         }
-    }
-}
-
-pub mod event {
-    use chrono::TimeZone;
-    use diesel::{
-        dsl::not, query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl,
-    };
-
-    use crate::schema::events;
-
-    use super::models::{Event, EventDeleteMany, EventFindMany};
-
-    pub fn find_many(query: EventFindMany) -> Result<Vec<Event>, result::Error> {
-        let mut query_builder = events::table.into_boxed();
-
-        if let Some(from) = query.from {
-            query_builder = FilterDsl::filter(query_builder, events::start_datetime.ge(from));
-        }
-
-        if let Some(to) = query.to {
-            query_builder = FilterDsl::filter(query_builder, events::end_datetime.le(to));
-        }
-
-        if let Some(ids_in) = query.ids_in {
-            query_builder = FilterDsl::filter(query_builder, events::id.eq_any(ids_in));
-        }
-
-        query_builder.load(&mut super::get_connection())
-    }
-
-    pub fn create_many(event: Vec<Event>) -> Result<(), std::io::Error> {
-        let result = diesel::insert_into(events::table)
-            .values(&event)
-            .execute(&mut super::get_connection());
-
-        match result {
-            Ok(_) => Ok(()),
-            // TODO エラー定義
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-        }
-    }
-
-    pub fn delete_many(query: EventDeleteMany) -> Result<(), std::io::Error> {
-        let result = diesel::delete(events::table)
-            .filter(events::id.eq_any(query.ids_in))
-            .execute(&mut super::get_connection());
-
-        match result {
-            Ok(_) => Ok(()),
-            // TODO エラー定義
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-        }
-    }
-
-    pub fn update() {
-        todo!()
-    }
-    pub fn delete() {
-        todo!()
     }
 }

@@ -36,6 +36,7 @@ impl Default for Event {
             status: None,
             start_datetime: chrono::Local::now().to_rfc3339(),
             end_datetime: (chrono::Local::now() + chrono::Duration::hours(1)).to_rfc3339(),
+            // TODO createdAt, updatedAt 追加
         }
     }
 }
@@ -55,8 +56,14 @@ impl Default for EventFindMany {
     }
 }
 
-pub struct EventDeleteMany {
-    pub ids_in: Vec<String>,
+#[derive(Queryable, AsChangeset)]
+#[diesel(table_name = events)]
+pub struct EventUpdate {
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub start_datetime: Option<String>,
+    pub end_datetime: Option<String>,
 }
 
 #[derive(
