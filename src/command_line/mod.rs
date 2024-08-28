@@ -7,7 +7,7 @@ use crate::{
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
-        models::{EventFindMany, OAuthToken},
+        models::{EventFindMany, NotificationUpdate, OAuthToken},
     },
 };
 
@@ -18,28 +18,82 @@ struct Args {
     test: Option<String>,
 }
 
+#[derive(PartialEq, Debug)]
+enum CommandLineState {
+    Top,
+    UpdateEnable,
+    End,
+}
+
 pub async fn run_command_loop_async() {
+    let mut state = CommandLineState::Top;
+
+    loop {
+        state = command_line_loop(state).await;
+
+        if state == CommandLineState::End {
+            break;
+        }
+    }
+
+    println!("end!");
+}
+
+async fn command_line_loop(mut state: CommandLineState) -> CommandLineState {
     let mut stdin_lines = io::stdin().lock().lines();
 
+    println!("🔵 state is {:?}", state);
+
+    let mut next_state = CommandLineState::Top;
+
+    // TODO while いらないかも
     while let Some(line) = stdin_lines.next() {
         match line {
             Ok(input) => {
-                if input.trim().is_empty() {
-                    break;
-                }
                 println!("Input: {}", input);
-
-                match input.as_str() {
-                    "token" => handle_command_token(),
-                    "refresh" => handle_command_refresh().await,
-                    "sync" => handle_command_sync().await,
-                    "list" => handle_list_notification().await,
-                    _ => {}
+                if input.trim().is_empty() {
+                    println!("Input is empty");
+                    next_state = CommandLineState::End;
+                    break;
+                } else if state == CommandLineState::UpdateEnable {
+                    handle_update_enabled(&mut state, input).await;
+                    next_state = CommandLineState::Top;
+                    break;
+                } else {
+                    match input.as_str() {
+                        "token" => {
+                            handle_command_token();
+                            next_state = CommandLineState::Top;
+                            break;
+                        }
+                        "refresh" => {
+                            handle_command_refresh().await;
+                            next_state = CommandLineState::Top;
+                            break;
+                        }
+                        "sync" => {
+                            handle_command_sync().await;
+                            next_state = CommandLineState::Top;
+                            break;
+                        }
+                        "list" => {
+                            handle_list_notification(&mut state).await;
+                            next_state = CommandLineState::UpdateEnable;
+                            break;
+                        }
+                        _ => {
+                            next_state = CommandLineState::Top;
+                            break;
+                        }
+                    }
                 }
             }
             Err(e) => eprintln!("Error occurred when reading line: {:?}", e),
-        }
+        };
+        println!("match ended");
     }
+
+    next_state
 }
 
 // TODO きれいに出力
@@ -112,7 +166,7 @@ async fn handle_command_sync() {
     }
 }
 
-async fn handle_list_notification() {
+async fn handle_list_notification(state: &mut CommandLineState) {
     let now = chrono::Local::now();
     let events = repository::event::find_many(EventFindMany {
         from: Some(now.to_rfc3339()),
@@ -121,21 +175,56 @@ async fn handle_list_notification() {
     })
     .unwrap();
 
+    let mut count = 0;
     println!("");
     println!("通知設定");
-    for (event, notification) in events {
+    for (event, notification) in events.clone() {
+        count = count + 1;
         let notified = if notification.enabled {
             format!("{}分前通知", notification.notification_sec_from_start / 60)
         } else {
             "通知なし".to_string()
         };
         println!(
-            "{}: {}開始 {}",
+            "{}: {}: {}開始 {}",
+            count,
             event.summary,
             chrono::DateTime::parse_from_rfc3339(event.start_datetime.as_str())
                 .expect("Error occurred when parsing start time, handle_list_notification")
                 .format("%m-%d %H:%M"),
             notified
         );
+    }
+    println!("番号を入力すると、通知のオンオフを切り替えます。");
+}
+
+async fn handle_update_enabled(state: &mut CommandLineState, input: String) {
+    let maybe_num = input.parse::<i32>();
+
+    match maybe_num {
+        Ok(num) => {
+            let now = chrono::Local::now();
+            let events = repository::event::find_many(EventFindMany {
+                from: Some(now.to_rfc3339()),
+                to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
+                ..Default::default()
+            })
+            .unwrap();
+
+            // TODO handle_list_notification の一覧の状態を保持しておいて、それを参照して更新する
+            let (event, notification) = events.get(num as usize).expect("event must be found");
+            repository::notification::update(
+                event.id.clone(),
+                NotificationUpdate {
+                    enabled: Some(!notification.enabled),
+                    ..Default::default()
+                },
+            )
+            .unwrap_or_else(|e| println!("Failed to update notification: {}", e));
+            println!("更新しました！");
+
+            let _ = handle_list_notification(state);
+        }
+        Err(_) => println!("数字を入力してください"),
     }
 }
