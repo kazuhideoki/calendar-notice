@@ -211,17 +211,25 @@ async fn handle_update_enabled(state: &mut CommandLineState, input: String) {
             })
             .unwrap();
 
-            // TODO handle_list_notification の一覧の状態を保持しておいて、それを参照して更新する
-            let (event, notification) = events.get(num as usize).expect("event must be found");
-            repository::notification::update(
-                event.id.clone(),
-                NotificationUpdate {
-                    enabled: Some(!notification.enabled),
-                    ..Default::default()
-                },
-            )
-            .unwrap_or_else(|e| println!("Failed to update notification: {}", e));
-            println!("更新しました！");
+            let events = events.get((num - 1) as usize);
+            if let Some((event, notification)) = events {
+                let enabled = !notification.enabled;
+                repository::notification::update(
+                    notification.event_id.clone(),
+                    NotificationUpdate {
+                        enabled: Some(enabled),
+                        ..Default::default()
+                    },
+                )
+                .unwrap_or_else(|e| println!("Failed to update notification: {}", e));
+                let enabled_str = if enabled { "有効" } else { "無効" };
+                println!(
+                    "{} の通知を {} に更新しました！",
+                    event.summary, enabled_str
+                );
+            } else {
+                println!("数字が範囲外です");
+            }
 
             let _ = handle_list_notification(state);
         }
