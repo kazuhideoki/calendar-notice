@@ -6,6 +6,7 @@ diesel::table! {
         summary -> Text,
         description -> Nullable<Text>,
         status -> Nullable<Text>,
+        hangout_link -> Nullable<Text>,
         start_datetime -> Timestamp,
         end_datetime -> Timestamp,
     }

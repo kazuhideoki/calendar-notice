@@ -23,6 +23,7 @@ pub struct Event {
     pub description: Option<String>,
     // TODO enum にできるか？
     pub status: Option<String>,
+    pub hangout_link: Option<String>,
     pub start_datetime: String,
     pub end_datetime: String,
 }
@@ -33,6 +34,7 @@ impl Default for Event {
             summary: "".to_string(),
             description: None,
             status: None,
+            hangout_link: None,
             start_datetime: chrono::Local::now().to_rfc3339(),
             end_datetime: (chrono::Local::now() + chrono::Duration::hours(1)).to_rfc3339(),
             // TODO createdAt, updatedAt 追加

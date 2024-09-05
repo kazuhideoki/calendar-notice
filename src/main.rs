@@ -14,10 +14,6 @@ use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;
 
 /**
-  機能追加
-  - 通知
-    - 筋の良い通知方法
-
   Improve
   - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
   - module整理 + テスト追加

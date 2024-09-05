@@ -371,6 +371,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                     .unwrap_or(&EventStatus::Unknown)
                     .to_string(),
             ),
+            hangout_link: event.hangout_link.clone(),
             start_datetime: event
                 .start
                 .date_time

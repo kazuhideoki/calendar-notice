@@ -1,11 +1,11 @@
 #![allow(unused_variables)]
-use std::process::Command;
+use std::{io, process::Command};
 
 use filter_upcoming_events::filter_upcoming_events;
 
 use crate::repository::{
     self,
-    models::{EventFindMany, NotificationUpdate},
+    models::{Event, EventFindMany, NotificationUpdate},
 };
 mod filter_upcoming_events;
 
@@ -25,7 +25,9 @@ pub fn spawn_notification_cron() {
                 Ok(events) => {
                     let upcoming_events = filter_upcoming_events(events);
                     for event in upcoming_events {
-                        notify();
+                        notify(event.clone()).unwrap_or_else(|e| {
+                            println!("Failed to notify event {}: {}", event.id, e)
+                        });
 
                         repository::notification::update(
                             event.id.clone(),
@@ -48,25 +50,37 @@ pub fn spawn_notification_cron() {
     });
 }
 
-fn notify() {
-    // カレンダーAPPを開く
-    let apple_script = format!(
+// TODO Result化
+fn notify(event: Event) -> Result<(), io::Error> {
+    // 会議リンクを抽出して Brave で開く
+    if let Some(link) = event.hangout_link {
+        let script = format!(
+            r#"
+        tell application "Brave Browser"
+            activate
+            open location "{}"
+        end tell
+        "#,
+            link
+        );
+        Command::new("osascript").arg("-e").arg(script).output()?;
+    }
+
+    // イベントの内容をダイアログで表示
+    let dialog_script = format!(
         r#"
-    tell application "Calendar"
-        activate
-    end tell
-"#
+tell app "System Events" to display dialog {} with title {}
+"#,
+        event.summary,
+        event.description.unwrap_or("".to_string())
     );
     Command::new("osascript")
         .arg("-e")
-        .arg(apple_script)
-        .output()
-        .expect("Failed to execute AppleScript");
+        .arg(dialog_script)
+        .output()?;
 
     // ビープ音を鳴らす
-    Command::new("osascript")
-        .arg("-e")
-        .arg("beep")
-        .output()
-        .expect("Failed to execute AppleScript");
+    Command::new("osascript").arg("-e").arg("beep").output()?;
+
+    Ok(())
 }
