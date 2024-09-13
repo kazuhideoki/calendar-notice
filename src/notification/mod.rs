@@ -66,21 +66,21 @@ fn notify(event: Event) -> Result<(), io::Error> {
         Command::new("osascript").arg("-e").arg(script).output()?;
     }
 
+    // ビープ音を鳴らす
+    Command::new("osascript").arg("-e").arg("beep").output()?;
+
     // イベントの内容をダイアログで表示
     let dialog_script = format!(
         r#"
-tell app "System Events" to display dialog {} with title {}
+tell app "System Events" to display dialog "{}" with title "{}"
 "#,
+        event.description.unwrap_or("".to_string()),
         event.summary,
-        event.description.unwrap_or("".to_string())
     );
     Command::new("osascript")
         .arg("-e")
         .arg(dialog_script)
         .output()?;
-
-    // ビープ音を鳴らす
-    Command::new("osascript").arg("-e").arg("beep").output()?;
 
     Ok(())
 }

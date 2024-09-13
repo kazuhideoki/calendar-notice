@@ -62,6 +62,7 @@ impl EventStatus {
  * TODO 不要な値を削る
  */
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GoogleCalendarEvent {
     pub kind: String,
     pub etag: String,
@@ -121,6 +122,7 @@ impl Default for GoogleCalendarEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EventPerson {
     email: String,
     display_name: Option<String>,
@@ -137,6 +139,7 @@ impl Default for EventPerson {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EventDateTime {
     #[serde(rename = "dateTime", default)]
     pub date_time: Option<String>,
@@ -156,6 +159,7 @@ impl Default for EventDateTime {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Attendee {
     email: String,
     display_name: Option<String>,
@@ -165,11 +169,13 @@ pub struct Attendee {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Reminders {
     use_default: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConferenceData {
     entry_points: Vec<EntryPoint>,
     conference_solution: ConferenceSolution,
@@ -177,6 +183,7 @@ pub struct ConferenceData {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EntryPoint {
     entry_point_type: String,
     uri: String,
@@ -186,6 +193,7 @@ pub struct EntryPoint {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConferenceSolution {
     key: ConferenceSolutionKey,
     name: String,
@@ -193,6 +201,7 @@ pub struct ConferenceSolution {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConferenceSolutionKey {
     #[serde(rename = "type")]
     type_: String,
@@ -344,6 +353,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                         .unwrap_or(&EventStatus::Unknown)
                         .to_string(),
                 ),
+                hangout_link: e.hangout_link.clone(),
                 start_datetime: Some(e.start.date_time.clone().unwrap()),
                 end_datetime: Some(e.end.date_time.clone().unwrap()),
             })
@@ -443,7 +453,9 @@ pub async fn list_events(access_token: String) -> Result<GoogleCalendarParent, E
     }
 
     let text = response.text().await?;
+    // println!("🔶 text: {:?}", text);
     let google_calendar_parent: GoogleCalendarParent =
         serde_json::from_str(&text).map_err(|e| Error::Parse(e.to_string()))?;
+    // println!("🔵 google_calendar_parent: {:?}", google_calendar_parent);
     Ok(google_calendar_parent)
 }

@@ -63,6 +63,7 @@ pub struct EventUpdate {
     pub summary: Option<String>,
     pub description: Option<String>,
     pub status: Option<String>,
+    pub hangout_link: Option<String>,
     pub start_datetime: Option<String>,
     pub end_datetime: Option<String>,
 }
