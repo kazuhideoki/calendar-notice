@@ -9,6 +9,7 @@ use warp::Filter;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    env::Env,
     google_calendar::sync_events,
     oauth::oauth_secret::OAuthSecret,
     repository::{
@@ -17,8 +18,6 @@ use crate::{
     },
 };
 
-const PORT: u16 = 8990;
-const BASE_URL: &str = "http://localhost";
 const AUTH_REDIRECT_PATH: &str = "auth";
 
 use warp::reject::Reject;
@@ -54,19 +53,22 @@ pub fn to_oauth_on_browser() {
 
     thread::sleep(Duration::from_secs(2));
 
-    let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string");
+    let Env { port, base_url, .. } = Env::new();
+
+    let oauth_url = format!("https://accounts.google.com/o/oauth2/auth?client_id=121773230254-om9bag3ku8958qmeiv2qa42ddjjfot3d.apps.googleusercontent.com&redirect_uri={}:{}/{AUTH_REDIRECT_PATH}&response_type=code&scope=https://www.googleapis.com/auth/calendar.readonly&access_type=offline&state=random_state_string",base_url, port);
 
     open::that(oauth_url).expect("Failed to open URL in browser");
 }
 
 pub fn spawn_redirect_server() {
     tokio::spawn(async {
+        let port = Env::new().port;
         let routes = warp::path(AUTH_REDIRECT_PATH)
             .and(warp::query::<std::collections::HashMap<String, String>>())
             .and_then(handle_oauth_redirect);
 
-        println!("HTTP server starting at {}", PORT);
-        warp::serve(routes).run(([127, 0, 0, 1], PORT)).await;
+        println!("HTTP server starting at {}", port.clone());
+        warp::serve(routes).run(([127, 0, 0, 1], port)).await;
     });
 }
 
@@ -115,6 +117,8 @@ async fn request_access_token_by_redirect(code: String) -> Result<String, reqwes
     } = OAuthSecret::get_from_file("oauth_secret.json")
         .unwrap_or_else(|e| panic!("Failed to get OAuthSecret from file: {}", e));
 
+    let Env { port, base_url, .. } = Env::new();
+
     // ステップ5 https://developers.google.com/identity/protocols/oauth2/native-app?hl=ja#uwp
     let mut body = HashMap::new();
     body.insert("code", code);
@@ -124,7 +128,7 @@ async fn request_access_token_by_redirect(code: String) -> Result<String, reqwes
     body.insert("code_challenge", generate_code_challenge());
     body.insert(
         "redirect_uri",
-        format!("{BASE_URL}:{PORT}/{AUTH_REDIRECT_PATH}",).to_string(),
+        format!("{}:{}/{AUTH_REDIRECT_PATH}", base_url, port).to_string(),
     );
 
     let client = reqwest::Client::new();

@@ -3,8 +3,9 @@ use dotenvy::dotenv;
 use std::env;
 
 pub struct Env {
-    pub test_token: Option<String>,
     pub database_url: String,
+    pub port: u16,
+    pub base_url: String,
 }
 
 impl Env {
@@ -12,8 +13,12 @@ impl Env {
         dotenv().ok();
 
         Env {
-            test_token: env::var("TEST_TOKEN").ok(),
             database_url: env::var("DATABASE_URL").expect("DATABASE_URL must be set"),
+            port: env::var("PORT")
+                .expect("PORT must be set")
+                .parse()
+                .expect("PORT must be a number"),
+            base_url: env::var("BASE_URL").expect("BASE_URL must be set"),
         }
     }
 }
