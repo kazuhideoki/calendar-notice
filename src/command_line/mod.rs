@@ -40,14 +40,13 @@ pub async fn run_command_loop_async() {
 }
 
 async fn command_line_loop(mut state: CommandLineState) -> CommandLineState {
-    let mut stdin_lines = io::stdin().lock().lines();
+    let stdin_lines = io::stdin().lock().lines();
 
     println!("🔵 state is {:?}", state);
 
     let mut next_state = CommandLineState::Top;
 
-    // TODO while いらないかも
-    while let Some(line) = stdin_lines.next() {
+    for line in stdin_lines {
         match line {
             Ok(input) => {
                 println!("Input: {}", input);
@@ -170,16 +169,16 @@ async fn handle_list_notification(state: &mut CommandLineState) {
     let now = chrono::Local::now();
     let events = repository::event::find_many(EventFindMany {
         from: Some(now.to_rfc3339()),
-        to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
+        to: Some((now + chrono::Duration::days(7)).to_rfc3339()),
         ..Default::default()
     })
     .unwrap();
 
     let mut count = 0;
-    println!("");
+    println!();
     println!("通知設定");
     for (event, notification) in events.clone() {
-        count = count + 1;
+        count += 1;
         let notified = if notification.enabled {
             format!("{}分前通知", notification.notification_sec_from_start / 60)
         } else {
@@ -231,7 +230,7 @@ async fn handle_update_enabled(state: &mut CommandLineState, input: String) {
                 println!("数字が範囲外です");
             }
 
-            let _ = handle_list_notification(state);
+            let _ = handle_list_notification(state).await;
         }
         Err(_) => println!("数字を入力してください"),
     }

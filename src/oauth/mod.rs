@@ -129,15 +129,13 @@ async fn request_access_token_by_redirect(code: String) -> Result<String, reqwes
 
     let client = reqwest::Client::new();
     let result = client.post(token_uri).form(&body).send().await;
-    let result = match result {
-        Ok(result) => result.text().await,
-        Err(e) => {
-            println!("Failed to get token: {:?}", e);
-            return Ok("Failed to get token".to_string());
-        }
-    };
-
-    result
+    match result {
+        Ok(result) => Ok(result
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("Failed to get token: {:?}", e))),
+        Err(e) => Err(e),
+    }
 }
 async fn request_access_token_by_refresh_token(
     refresh_token: String,
@@ -157,15 +155,13 @@ async fn request_access_token_by_refresh_token(
 
     let client = reqwest::Client::new();
     let result = client.post(token_uri).form(&body).send().await;
-    let result = match result {
-        Ok(result) => result.text().await,
-        Err(e) => {
-            println!("Failed to get token: {:?}", e);
-            return Ok("Failed to get token".to_string());
-        }
-    };
-
-    result
+    match result {
+        Ok(result) => Ok(result
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("Failed to get token by refresh token: {:?}", e))),
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn refresh_and_save_token(id: String, refresh_token: String) {

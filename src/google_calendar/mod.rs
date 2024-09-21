@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+use std::fmt;
 use std::thread;
 use std::time::Duration;
 
@@ -43,13 +44,14 @@ pub enum EventStatus {
     #[serde(other)]
     Unknown,
 }
-impl EventStatus {
-    pub fn to_string(&self) -> String {
+
+impl fmt::Display for EventStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            EventStatus::Confirmed => "confirmed".to_string(),
-            EventStatus::Tentative => "tentative".to_string(),
-            EventStatus::Cancelled => "cancelled".to_string(),
-            EventStatus::Unknown => "unknown".to_string(),
+            EventStatus::Confirmed => write!(f, "confirmed"),
+            EventStatus::Tentative => write!(f, "tentative"),
+            EventStatus::Cancelled => write!(f, "cancelled"),
+            EventStatus::Unknown => write!(f, "unknown"),
         }
     }
 }
@@ -121,24 +123,15 @@ impl Default for GoogleCalendarEvent {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EventPerson {
     email: String,
     display_name: Option<String>,
     self_: Option<bool>,
 }
-impl Default for EventPerson {
-    fn default() -> Self {
-        Self {
-            email: String::new(),
-            display_name: None,
-            self_: None,
-        }
-    }
-}
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct EventDateTime {
     #[serde(rename = "dateTime", default)]
@@ -147,15 +140,6 @@ pub struct EventDateTime {
     pub date: Option<String>,
     #[serde(rename = "timeZone")]
     pub time_zone: Option<String>,
-}
-impl Default for EventDateTime {
-    fn default() -> Self {
-        Self {
-            date_time: None,
-            date: None,
-            time_zone: None,
-        }
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -257,7 +241,7 @@ pub fn spawn_sync_calendar_cron() {
                     });
                 }
                 Some(oauth_token) => {
-                    let _ = sync_events(oauth_token).await.unwrap_or_else(|e| {
+                    sync_events(oauth_token).await.unwrap_or_else(|e| {
                         println!(
                             "Failed to sync events in run_sync_calendar_cron_thread: {:?}",
                             e

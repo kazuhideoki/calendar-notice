@@ -18,7 +18,6 @@ use oauth::spawn_redirect_server;
   - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
   - module整理 + テスト追加
   - 一部 env に逃がすか？
-  - Clippy(リンター) の導入
   - doc つくる
 */
 #[tokio::main]

@@ -42,19 +42,11 @@ impl Default for Event {
     }
 }
 
+#[derive(Default)]
 pub struct EventFindMany {
     pub from: Option<String>,
     pub to: Option<String>,
     pub ids_in: Option<Vec<String>>,
-}
-impl Default for EventFindMany {
-    fn default() -> Self {
-        EventFindMany {
-            from: None,
-            to: None,
-            ids_in: None,
-        }
-    }
 }
 
 #[derive(Queryable, AsChangeset)]
@@ -97,19 +89,11 @@ impl Default for Notification {
     }
 }
 
-#[derive(Queryable, AsChangeset)]
+#[derive(Queryable, AsChangeset, Default)]
 #[diesel(table_name = notifications)]
 pub struct NotificationUpdate {
     pub enabled: Option<bool>,
     pub notification_sec_from_start: Option<i32>,
-}
-impl Default for NotificationUpdate {
-    fn default() -> Self {
-        NotificationUpdate {
-            enabled: None,
-            notification_sec_from_start: None,
-        }
-    }
 }
 
 #[derive(
