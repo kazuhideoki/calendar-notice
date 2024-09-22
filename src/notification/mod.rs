@@ -50,20 +50,37 @@ pub fn spawn_notification_cron() {
     });
 }
 
-// TODO Result化
 fn notify(event: Event) -> Result<(), io::Error> {
-    // 会議リンクを抽出して Brave で開く
-    if let Some(link) = event.hangout_link {
-        let script = format!(
-            r#"
-        tell application "Brave Browser"
-            activate
-            open location "{}"
-        end tell
-        "#,
-            link
-        );
-        Command::new("osascript").arg("-e").arg(script).output()?;
+    // Zoom を開く なければ Meet を開く
+    match event {
+        Event {
+            zoom_link: Some(link),
+            ..
+        } => {
+            Command::new("open")
+                .arg("-a")
+                .arg("zoom.us")
+                .arg(link)
+                .output()?;
+        }
+        Event {
+            hangout_link: Some(link),
+            ..
+        } => {
+            let script = format!(
+                r#"
+            tell application "Brave Browser"
+                activate
+                open location "{}"
+            end tell
+            "#,
+                link
+            );
+            Command::new("osascript").arg("-e").arg(script).output()?;
+        }
+        _ => {
+            println!("No link for meeting found")
+        }
     }
 
     // ビープ音を鳴らす
