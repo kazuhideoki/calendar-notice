@@ -4,6 +4,7 @@ use std::io::{self, BufRead};
 
 use crate::{
     google_calendar::sync_events,
+    notification::NOTIFICATION_PERIOD_DAYS,
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
@@ -169,7 +170,7 @@ async fn handle_list_notification(state: &mut CommandLineState) {
     let now = chrono::Local::now();
     let events = repository::event::find_many(EventFindMany {
         from: Some(now.to_rfc3339()),
-        to: Some((now + chrono::Duration::days(7)).to_rfc3339()),
+        to: Some((now + chrono::Duration::days(NOTIFICATION_PERIOD_DAYS)).to_rfc3339()),
         ..Default::default()
     })
     .unwrap();
@@ -205,7 +206,7 @@ async fn handle_update_enabled(state: &mut CommandLineState, input: String) {
             let now = chrono::Local::now();
             let events = repository::event::find_many(EventFindMany {
                 from: Some(now.to_rfc3339()),
-                to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
+                to: Some((now + chrono::Duration::days(NOTIFICATION_PERIOD_DAYS)).to_rfc3339()),
                 ..Default::default()
             })
             .unwrap();

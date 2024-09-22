@@ -15,7 +15,6 @@ use oauth::spawn_redirect_server;
 
 /**
 functoin..
-- zoom リンクを取得、自動起動
 - TUI での操作
 - 「参加する/辞退する」変更
   - 辞退したら通知もなしにする

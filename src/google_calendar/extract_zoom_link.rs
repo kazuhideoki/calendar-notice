@@ -13,7 +13,7 @@ use regex::Regex;
 /// # Examples
 ///
 /// ```
-/// use calendar_notice::google_calendar::extract_zoom_link::extract_zoom_link;
+/// use calendar_notice::google_calendar::extract_zoom_link;
 ///
 /// let description = "ミーティングリンク: https://zoom.us/j/95428352872?pwd=SYUHanJf8xXQR51lhTKI8u3RSDWLVF.1";
 /// assert_eq!(

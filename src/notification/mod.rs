@@ -10,6 +10,7 @@ use crate::repository::{
 mod filter_upcoming_events;
 
 const NOTIFICATION_INTERVAL_SEC: u16 = 60;
+pub const NOTIFICATION_PERIOD_DAYS: i64 = 7;
 
 pub fn spawn_notification_cron() {
     tokio::spawn(async {
@@ -17,7 +18,7 @@ pub fn spawn_notification_cron() {
             let now = chrono::Local::now();
             let events = repository::event::find_many(EventFindMany {
                 from: Some(now.to_rfc3339()),
-                to: Some((now + chrono::Duration::days(2)).to_rfc3339()),
+                to: Some((now + chrono::Duration::days(NOTIFICATION_PERIOD_DAYS)).to_rfc3339()),
                 ..Default::default()
             });
 

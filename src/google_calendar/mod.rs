@@ -15,7 +15,9 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-pub mod extract_zoom_link;
+// pub mod extract_zoom_link;
+mod extract_zoom_link;
+pub use self::extract_zoom_link::extract_zoom_link;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleCalendarParent {
@@ -340,6 +342,10 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                         .to_string(),
                 ),
                 hangout_link: e.hangout_link.clone(),
+                zoom_link: match e.description {
+                    Some(ref description) => extract_zoom_link(description),
+                    None => None,
+                },
                 start_datetime: Some(e.start.date_time.clone().unwrap()),
                 end_datetime: Some(e.end.date_time.clone().unwrap()),
             })
@@ -368,6 +374,10 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                     .to_string(),
             ),
             hangout_link: event.hangout_link.clone(),
+            zoom_link: match event.description {
+                Some(ref description) => extract_zoom_link(description),
+                None => None,
+            },
             start_datetime: event
                 .start
                 .date_time
