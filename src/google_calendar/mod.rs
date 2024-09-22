@@ -15,6 +15,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+pub mod extract_zoom_link;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleCalendarParent {
     pub kind: String,

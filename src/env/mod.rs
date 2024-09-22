@@ -2,6 +2,7 @@
 use dotenvy::dotenv;
 use std::env;
 
+#[derive(Default)]
 pub struct Env {
     pub database_url: String,
     pub port: u16,
