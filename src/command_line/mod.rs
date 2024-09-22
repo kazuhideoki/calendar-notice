@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use clap::Parser;
 use std::io::{self, BufRead};
 
@@ -166,7 +165,7 @@ async fn handle_command_sync() {
     }
 }
 
-async fn handle_list_notification(state: &mut CommandLineState) {
+async fn handle_list_notification(_: &mut CommandLineState) {
     let now = chrono::Local::now();
     let events = repository::event::find_many(EventFindMany {
         from: Some(now.to_rfc3339()),

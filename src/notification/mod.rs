@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use std::{io, process::Command};
 
 use filter_upcoming_events::filter_upcoming_events;

@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use crate::repository::models::{Event, Notification};
 
 pub fn filter_upcoming_events(events: Vec<(Event, Notification)>) -> Vec<Event> {

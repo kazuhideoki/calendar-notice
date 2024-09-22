@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use std::fmt;
 use std::thread;
 use std::time::Duration;
@@ -235,7 +234,7 @@ pub fn spawn_sync_calendar_cron() {
                     )
                     .await;
 
-                    let new_token =
+                    let _ =
                         repository::oauth_token::find_latest().expect("new token must be found");
                     sync_events(oauth_token).await.unwrap_or_else(|e| {
                         println!(

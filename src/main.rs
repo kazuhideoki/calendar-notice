@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 mod command_line;
 mod env;
 mod google_calendar;

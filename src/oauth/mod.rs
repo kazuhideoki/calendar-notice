@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 pub mod is_token_expired;
 mod oauth_secret;
 
