@@ -10,18 +10,14 @@ const EXPIRED_MARGIN_SEC: i64 = 60;
 pub fn is_token_expired<Tz: TimeZone>(token: &OAuthToken, now: DateTime<Tz>) -> bool {
     let updated_at = chrono::DateTime::parse_from_rfc3339(&token.updated_at)
         .unwrap_or_else(|e| panic!("Failed to parse updated_at: {:?}", e));
-    println!("updated_at: {:?}", updated_at);
     let expires_in = token
         .expires_in
         .as_ref()
         .unwrap_or(&"0".to_string())
         .parse::<i64>()
         .expect("Failed to parse expires_in");
-    println!("expires_in: {:?}", expires_in);
     let expired_with_margin_at =
         updated_at + chrono::Duration::seconds(expires_in - EXPIRED_MARGIN_SEC);
-    println!("expired_with_margin_at: {:?}", expired_with_margin_at);
-    println!("now: {:?}", now);
 
     expired_with_margin_at < now
 }

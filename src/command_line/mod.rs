@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::io::{self, BufRead};
+use ui::UI;
 
 use crate::{
     google_calendar::sync_events,
@@ -7,9 +8,11 @@ use crate::{
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
-        models::{EventFindMany, NotificationUpdate, OAuthToken},
+        models::{self, EventFindMany, NotificationUpdate, OAuthToken},
     },
 };
+
+mod ui;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None, disable_help_flag = true)]
@@ -27,6 +30,26 @@ enum CommandLineState {
 
 pub async fn run_command_loop_async() {
     let mut state = CommandLineState::Top;
+
+    // TODO 整理
+    let mut terminal = ratatui::init();
+    let now = chrono::Utc::now();
+    let events = repository::event::find_many(EventFindMany {
+        from: Some(now.to_rfc3339()),
+        to: Some((now + chrono::Duration::days(NOTIFICATION_PERIOD_DAYS)).to_rfc3339()),
+        ..Default::default()
+    })
+    .expect("Failed to find events.")
+    .into_iter()
+    .map(|(event, _)| event)
+    .collect::<Vec<models::Event>>();
+
+    let mut ui = UI {
+        events,
+        ..Default::default()
+    };
+    let _ = ui.run(&mut terminal);
+    ratatui::restore();
 
     loop {
         state = command_line_loop(state).await;
@@ -46,6 +69,8 @@ async fn command_line_loop(mut state: CommandLineState) -> CommandLineState {
 
     let mut next_state = CommandLineState::Top;
 
+    // ここまでに一覧が表示されている
+    // この入力がワンキーコマンドになる
     for line in stdin_lines {
         match line {
             Ok(input) => {

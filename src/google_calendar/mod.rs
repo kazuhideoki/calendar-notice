@@ -237,10 +237,10 @@ pub fn spawn_sync_calendar_cron() {
                     let _ =
                         repository::oauth_token::find_latest().expect("new token must be found");
                     sync_events(oauth_token).await.unwrap_or_else(|e| {
-                        println!(
-                            "Failed to sync events in run_sync_calendar_cron_thread with new token: {:?}",
-                            e
-                        )
+                        // println!(
+                        //     "Failed to sync events in run_sync_calendar_cron_thread with new token: {:?}",
+                        //     e
+                        // )
                     });
                 }
                 Some(oauth_token) => {
@@ -298,14 +298,14 @@ pub async fn handle_google_calendar_event_result(
 }
 
 pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(), String> {
-    println!(
-        "fetched google calendar events: {:?}",
-        google_calendar_parent
-            .items
-            .iter()
-            .map(|item| &item.summary)
-            .collect::<Vec<&String>>()
-    );
+    // println!(
+    //     "fetched google calendar events: {:?}",
+    //     google_calendar_parent
+    //         .items
+    //         .iter()
+    //         .map(|item| &item.summary)
+    //         .collect::<Vec<&String>>()
+    // );
 
     let duplicated_events = repository::event::find_many(EventFindMany {
         ids_in: Some(
@@ -443,7 +443,7 @@ pub async fn list_events(access_token: String) -> Result<GoogleCalendarParent, E
         .send()
         .await?;
     if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        println!("Unauthorized when requesting list events");
+        // println!("Unauthorized when requesting list events");
         return Err(Error::Unauthorized);
     }
 
