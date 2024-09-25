@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use clap::Parser;
 use std::io::{self, BufRead};
 use ui::UI;
@@ -33,10 +34,18 @@ pub async fn run_command_loop_async() {
 
     // TODO 整理
     let mut terminal = ratatui::init();
-    let now = chrono::Utc::now();
+    let start_of_today = chrono::Local::now()
+        .with_hour(0)
+        .unwrap()
+        .with_minute(0)
+        .unwrap()
+        .with_second(0)
+        .unwrap();
+    let tomorrow = start_of_today + chrono::Duration::days(1);
+
     let events = repository::event::find_many(EventFindMany {
-        from: Some(now.to_rfc3339()),
-        to: Some((now + chrono::Duration::days(NOTIFICATION_PERIOD_DAYS)).to_rfc3339()),
+        from: Some(start_of_today.to_rfc3339()),
+        to: Some(tomorrow.to_rfc3339()),
         ..Default::default()
     })
     .expect("Failed to find events.")
