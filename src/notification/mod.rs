@@ -51,6 +51,33 @@ pub fn spawn_notification_cron() {
 }
 
 fn notify(event: Event) -> Result<(), io::Error> {
+    // ビープ音を鳴らす
+    Command::new("osascript").arg("-e").arg("beep").output()?;
+
+    // イベントの内容をダイアログで表示
+    let join = "会議に参加";
+    let cancel = "キャンセル";
+    let dialog_script = format!(
+        r#"
+                tell application "System Events"
+                    set theResponse to display dialog "{}" with title "{}" buttons {{"{}","{}"}} default button "{}"
+                    set theButton to button returned of theResponse
+                    return theButton
+                end tell
+                "#,
+        "ほげ~", "タイトル", cancel, join, join
+    );
+    let button_result = Command::new("osascript")
+        .arg("-e")
+        .arg(dialog_script)
+        .output()?;
+
+    // キャンセルされた場合は何もしない
+    if button_result.stdout == b"" {
+        println!("Canceled joining the meeting");
+        return Ok(());
+    }
+
     // Zoom を開く なければ Meet を開く
     match event {
         Event {
@@ -82,22 +109,6 @@ fn notify(event: Event) -> Result<(), io::Error> {
             println!("No link for meeting found")
         }
     }
-
-    // ビープ音を鳴らす
-    Command::new("osascript").arg("-e").arg("beep").output()?;
-
-    // イベントの内容をダイアログで表示
-    let dialog_script = format!(
-        r#"
-tell app "System Events" to display dialog "{}" with title "{}"
-"#,
-        event.description.unwrap_or("".to_string()),
-        event.summary,
-    );
-    Command::new("osascript")
-        .arg("-e")
-        .arg(dialog_script)
-        .output()?;
 
     Ok(())
 }
