@@ -138,7 +138,7 @@ fn handle_command_token() {
             println!("{:?}", token);
         }
         Ok(None) => {
-            println!("OAuth token is not found");
+            // println!("OAuth token is not found");
         }
         Err(e) => {
             eprintln!("Error: {:?}", e);
@@ -169,7 +169,7 @@ async fn handle_command_sync() {
                 .as_ref()
                 .map_or(true, |token| is_token_expired(token, chrono::Local::now()))
             {
-                println!("OAuth token is not found. Please authenticate again.");
+                // println!("OAuth token is not found. Please authenticate again.");
                 if let Some(OAuthToken {
                     refresh_token: Some(refresh_token),
                     ..

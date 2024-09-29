@@ -12,15 +12,16 @@ use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;
 
 /**
-- teams に対応
-- テーブル
-  - notification は event に統合してもいいかも。シンプルになるから?
-  - oauth_tokens を先に持ってくれば管理楽そう
-
 functoin..
 - TUI での操作
 - 「参加する/辞退する」変更
   - 辞退したら通知もなしにする
+- 初期起動時のUI調整
+
+db..
+- テーブル
+  - notification は event に統合してもいいかも。シンプルになるから?
+  - oauth_tokens を先に持ってくれば管理楽そう
 
 improvement..
 - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐

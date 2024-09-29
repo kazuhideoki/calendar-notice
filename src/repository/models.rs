@@ -25,6 +25,7 @@ pub struct Event {
     pub status: Option<String>,
     pub hangout_link: Option<String>,
     pub zoom_link: Option<String>,
+    pub teams_link: Option<String>,
     pub start_datetime: String,
     pub end_datetime: String,
 }
@@ -37,6 +38,7 @@ impl Default for Event {
             status: None,
             hangout_link: None,
             zoom_link: None,
+            teams_link: None,
             start_datetime: chrono::Local::now().to_rfc3339(),
             end_datetime: (chrono::Local::now() + chrono::Duration::hours(1)).to_rfc3339(),
             // TODO createdAt, updatedAt 追加
@@ -59,6 +61,7 @@ pub struct EventUpdate {
     pub status: Option<String>,
     pub hangout_link: Option<String>,
     pub zoom_link: Option<String>,
+    pub teams_link: Option<String>,
     pub start_datetime: Option<String>,
     pub end_datetime: Option<String>,
 }

@@ -65,7 +65,11 @@ fn notify(event: Event) -> Result<(), io::Error> {
                     return theButton
                 end tell
                 "#,
-        "ほげ~", "タイトル", cancel, join, join
+        event.description.unwrap_or("".to_string()),
+        event.summary,
+        cancel,
+        join,
+        join
     );
     let button_result = Command::new("osascript")
         .arg("-e")
@@ -78,8 +82,12 @@ fn notify(event: Event) -> Result<(), io::Error> {
         return Ok(());
     }
 
-    // Zoom を開く なければ Meet を開く
+    // Teams を開く、なければ Zoom を開く、 なければ Meet を開く
     match event {
+        Event {
+            teams_link: Some(link),
+            ..
+        } => open_with_browser(&link)?,
         Event {
             zoom_link: Some(link),
             ..
@@ -93,22 +101,25 @@ fn notify(event: Event) -> Result<(), io::Error> {
         Event {
             hangout_link: Some(link),
             ..
-        } => {
-            let script = format!(
-                r#"
-            tell application "Brave Browser"
-                activate
-                open location "{}"
-            end tell
-            "#,
-                link
-            );
-            Command::new("osascript").arg("-e").arg(script).output()?;
-        }
+        } => open_with_browser(&link)?,
         _ => {
             println!("No link for meeting found")
         }
     }
 
+    Ok(())
+}
+
+fn open_with_browser(link: &str) -> Result<(), io::Error> {
+    let script = format!(
+        r#"
+        tell application "Brave Browser"
+            activate
+            open location "{}"
+        end tell
+        "#,
+        link
+    );
+    Command::new("osascript").arg("-e").arg(script).output()?;
     Ok(())
 }

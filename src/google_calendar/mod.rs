@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 // pub mod extract_zoom_link;
 mod extract_zoom_link;
 pub use self::extract_zoom_link::extract_zoom_link;
+mod extract_teams_link;
+pub use self::extract_teams_link::extract_teams_link;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleCalendarParent {
@@ -252,7 +254,7 @@ pub fn spawn_sync_calendar_cron() {
                     });
                 }
                 None => {
-                    println!("OAuth token is not found. Please authenticate ");
+                    // println!("OAuth token is not found. Please authenticate ");
                     // TODO 認証完了まで、次のループで再度認証催促が発生するのを防ぐ？
                     oauth::to_oauth_on_browser();
                 }
@@ -345,6 +347,10 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                     Some(ref description) => extract_zoom_link(description),
                     None => None,
                 },
+                teams_link: match e.description {
+                    Some(ref description) => extract_teams_link(description),
+                    None => None,
+                },
                 start_datetime: Some(e.start.date_time.clone().unwrap()),
                 end_datetime: Some(e.end.date_time.clone().unwrap()),
             })
@@ -375,6 +381,10 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
             hangout_link: event.hangout_link.clone(),
             zoom_link: match event.description {
                 Some(ref description) => extract_zoom_link(description),
+                None => None,
+            },
+            teams_link: match event.description {
+                Some(ref description) => extract_teams_link(description),
                 None => None,
             },
             start_datetime: event

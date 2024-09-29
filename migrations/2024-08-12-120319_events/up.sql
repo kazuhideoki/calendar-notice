@@ -5,6 +5,7 @@ CREATE TABLE events (
   status TEXT,
   hangout_link TEXT,
   zoom_link TEXT,
+  teams_link TEXT,
   start_datetime DATETIME NOT NULL,
   end_datetime DATETIME NOT NULL
 );
