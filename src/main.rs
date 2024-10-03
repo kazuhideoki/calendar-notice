@@ -5,11 +5,14 @@ mod notification;
 mod oauth;
 mod repository;
 mod schema;
+mod tui;
 
-use command_line::run_command_loop_async;
+use std::sync::mpsc::{self, Receiver, Sender};
+
 use google_calendar::spawn_sync_calendar_cron;
 use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;
+use tui::show_tui;
 
 /**
 functoin..
@@ -24,6 +27,7 @@ db..
   - oauth_tokens を先に持ってくれば管理楽そう
 
 improvement..
+- summary がない時もある タイトルなしの時
 - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
 - module整理 + テスト追加
 */
@@ -31,9 +35,9 @@ improvement..
 async fn main() {
     spawn_redirect_server();
 
-    spawn_sync_calendar_cron();
-
     spawn_notification_cron();
 
-    run_command_loop_async().await;
+    spawn_sync_calendar_cron();
+
+    show_tui();
 }
