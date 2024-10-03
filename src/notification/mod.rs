@@ -78,7 +78,7 @@ fn notify(event: Event) -> Result<(), io::Error> {
 
     // キャンセルされた場合は何もしない
     if button_result.stdout == b"" {
-        println!("Canceled joining the meeting");
+        // println!("Canceled joining the meeting");
         return Ok(());
     }
 
