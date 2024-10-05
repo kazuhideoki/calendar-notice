@@ -132,7 +132,12 @@ impl Widget for &UI {
             let cells = [
                 Cell::from((index + 1).to_string()),
                 Cell::from(datetime.format("%m-%d %H-%M").to_string()),
-                Cell::from(event.summary.clone()),
+                Cell::from(
+                    event
+                        .summary
+                        .clone()
+                        .unwrap_or("[タイトル未設定]".to_string()),
+                ),
             ];
 
             Row::new(cells)

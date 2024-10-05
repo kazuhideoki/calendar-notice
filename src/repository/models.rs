@@ -57,7 +57,7 @@ pub struct OAuthTokenUpdate {
 // TODO createdAt 追加
 pub struct Event {
     pub id: String,
-    pub summary: String,
+    pub summary: Option<String>,
     pub description: Option<String>,
     // TODO enum にできるか？
     pub status: Option<String>,

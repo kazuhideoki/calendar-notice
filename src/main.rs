@@ -7,8 +7,6 @@ mod repository;
 mod schema;
 mod tui;
 
-use std::sync::mpsc::{self, Receiver, Sender};
-
 use google_calendar::spawn_sync_calendar_cron;
 use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;

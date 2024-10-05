@@ -3,7 +3,7 @@
 diesel::table! {
     events (id) {
         id -> Text,
-        summary -> Text,
+        summary -> Nullable<Text>,
         description -> Nullable<Text>,
         status -> Nullable<Text>,
         hangout_link -> Nullable<Text>,

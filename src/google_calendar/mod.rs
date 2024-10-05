@@ -370,7 +370,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
         .clone()
         .map(|event| Event {
             id: event.id.clone(),
-            summary: event.summary.clone(),
+            summary: Some(event.summary.clone()),
             description: event.description.clone(),
             status: Some(
                 event

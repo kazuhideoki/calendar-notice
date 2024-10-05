@@ -66,7 +66,7 @@ fn notify(event: Event) -> Result<(), io::Error> {
                 end tell
                 "#,
         event.description.unwrap_or("".to_string()),
-        event.summary,
+        event.summary.unwrap_or("[タイトル未設定]".to_string()),
         cancel,
         join,
         join
