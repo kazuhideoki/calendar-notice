@@ -56,18 +56,17 @@ fn get_connection() -> PooledConnection<ConnectionManager<SqliteConnection>> {
 
 pub mod event {
     use diesel::{
-        query_dsl::methods::FilterDsl, result, ExpressionMethods, JoinOnDsl, QueryDsl, RunQueryDsl,
+        query_dsl::methods::FilterDsl, result, ExpressionMethods, QueryDsl, RunQueryDsl,
         SelectableHelper,
     };
 
-    use crate::schema::{events, notifications};
+    use crate::schema::events;
 
-    use super::models::{Event, EventFindMany, EventUpdate, Notification};
+    use super::models::{Event, EventFindMany, EventUpdate};
 
-    pub fn find_many(query: EventFindMany) -> Result<Vec<(Event, Notification)>, result::Error> {
+    pub fn find_many(query: EventFindMany) -> Result<Vec<Event>, result::Error> {
         let mut query_builder = events::table
-            .inner_join(notifications::table.on(events::id.eq(notifications::event_id)))
-            .select((Event::as_select(), Notification::as_select()))
+            .select(Event::as_select())
             .order(events::start_datetime.asc())
             .into_boxed();
 
@@ -101,41 +100,6 @@ pub mod event {
     pub fn update(id: String, event_update: EventUpdate) -> Result<(), std::io::Error> {
         let result = diesel::update(events::table.find(id))
             .set(&event_update)
-            .execute(&mut super::get_connection());
-
-        match result {
-            Ok(_) => Ok(()),
-            // TODO エラー定義
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-        }
-    }
-}
-
-pub mod notification {
-    use diesel::{QueryDsl, RunQueryDsl};
-
-    use crate::schema::notifications;
-
-    use super::models::{Notification, NotificationUpdate};
-
-    pub fn create_many(notifications: Vec<Notification>) -> Result<(), std::io::Error> {
-        let result = diesel::insert_into(notifications::table)
-            .values(&notifications)
-            .execute(&mut super::get_connection());
-
-        match result {
-            Ok(_) => Ok(()),
-            // TODO エラー定義
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
-        }
-    }
-
-    pub fn update(
-        event_id: String,
-        notification_update: NotificationUpdate,
-    ) -> Result<(), std::io::Error> {
-        let result = diesel::update(notifications::table.find(event_id))
-            .set(&notification_update)
             .execute(&mut super::get_connection());
 
         match result {

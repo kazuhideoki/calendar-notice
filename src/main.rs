@@ -23,7 +23,6 @@ functoin..
 
 db..
 - テーブル
-  - notification は event に統合してもいいかも。シンプルになるから?
   - oauth_tokens を先に持ってくれば管理楽そう
 
 improvement..

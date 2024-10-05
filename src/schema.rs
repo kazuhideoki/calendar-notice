@@ -11,13 +11,7 @@ diesel::table! {
         teams_link -> Nullable<Text>,
         start_datetime -> Timestamp,
         end_datetime -> Timestamp,
-    }
-}
-
-diesel::table! {
-    notifications (event_id) {
-        event_id -> Text,
-        enabled -> Bool,
+        notification_enabled -> Bool,
         notification_sec_from_start -> Integer,
     }
 }
@@ -35,10 +29,7 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(notifications -> events (event_id));
-
 diesel::allow_tables_to_appear_in_same_query!(
     events,
-    notifications,
     oauth_tokens,
 );

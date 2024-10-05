@@ -4,7 +4,7 @@ use filter_upcoming_events::filter_upcoming_events;
 
 use crate::repository::{
     self,
-    models::{Event, EventFindMany, NotificationUpdate},
+    models::{Event, EventFindMany, EventUpdate},
 };
 mod filter_upcoming_events;
 
@@ -29,10 +29,10 @@ pub fn spawn_notification_cron() {
                             println!("Failed to notify event {}: {}", event.id, e)
                         });
 
-                        repository::notification::update(
+                        repository::event::update(
                             event.id.clone(),
-                            NotificationUpdate {
-                                enabled: Some(false),
+                            EventUpdate {
+                                notification_enabled: Some(false),
                                 ..Default::default()
                             },
                         )

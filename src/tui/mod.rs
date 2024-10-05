@@ -38,7 +38,6 @@ fn fetch_today_events() -> Vec<models::Event> {
     })
     .expect("Failed to find events.")
     .into_iter()
-    .map(|(event, _)| event)
     .collect::<Vec<models::Event>>();
 
     events

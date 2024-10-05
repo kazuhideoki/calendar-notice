@@ -9,7 +9,7 @@ use crate::{
     oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
-        models::{Event, EventFindMany, EventUpdate, Notification, OAuthToken},
+        models::{Event, EventFindMany, EventUpdate, OAuthToken},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -238,7 +238,7 @@ pub fn spawn_sync_calendar_cron() {
 
                     let _ =
                         repository::oauth_token::find_latest().expect("new token must be found");
-                    sync_events(oauth_token).await.unwrap_or_else(|e| {
+                    sync_events(oauth_token).await.unwrap_or_else(|_| {
                         // println!(
                         //     "Failed to sync events in run_sync_calendar_cron_thread with new token: {:?}",
                         //     e
@@ -328,7 +328,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
     });
 
     // すでに存在するイベントは、events を更新する
-    for (event, _) in &duplicated_events {
+    for event in &duplicated_events {
         let event_update: EventUpdate = google_calendar_parent
             .items
             .iter()
@@ -353,16 +353,17 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                 },
                 start_datetime: Some(e.start.date_time.clone().unwrap()),
                 end_datetime: Some(e.end.date_time.clone().unwrap()),
+                ..Default::default()
             })
             .expect("EventUpdate must be created");
         let _ = repository::event::update(event.id.clone(), event_update);
     }
 
-    // 新規イベントは、events と notifications を作成する
+    // 新規イベントは、events を作成する
     let new_google_calendar_events = google_calendar_parent.items.iter().filter(|event| {
         !duplicated_events
             .iter()
-            .any(|duplicated_event| duplicated_event.0.id == event.id)
+            .any(|duplicated_event| duplicated_event.id == event.id)
     });
 
     let event_creates: Vec<Event> = new_google_calendar_events
@@ -397,23 +398,13 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
                 .date_time
                 .clone()
                 .expect("end_datetime must exist"),
+            notification_enabled: true,
+            notification_sec_from_start: 60 * 10,
         })
         .collect();
     let event_result = repository::event::create_many(event_creates);
     if let Err(e) = event_result {
         return Err(format!("Failed to create events: {:?}", e).to_string());
-    }
-
-    let notification_creates: Vec<Notification> = new_google_calendar_events
-        .map(|event| Notification {
-            event_id: event.id.clone(),
-            enabled: true,
-            notification_sec_from_start: 60 * 10,
-        })
-        .collect();
-    let notification_result = repository::notification::create_many(notification_creates);
-    if let Err(e) = notification_result {
-        return Err(format!("Failed to create notifications: {:?}", e).to_string());
     }
 
     Ok(())

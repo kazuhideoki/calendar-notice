@@ -7,5 +7,7 @@ CREATE TABLE events (
   zoom_link TEXT,
   teams_link TEXT,
   start_datetime DATETIME NOT NULL,
-  end_datetime DATETIME NOT NULL
+  end_datetime DATETIME NOT NULL,
+  notification_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  notification_sec_from_start INTEGER NOT NULL
 );
