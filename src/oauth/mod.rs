@@ -66,7 +66,7 @@ pub fn spawn_redirect_server() {
             .and(warp::query::<std::collections::HashMap<String, String>>())
             .and_then(handle_oauth_redirect);
 
-        println!("HTTP server starting at {}", port.clone());
+        // println!("HTTP server starting at {}", port.clone());
         warp::serve(routes).run(([127, 0, 0, 1], port)).await;
     });
 }
@@ -182,7 +182,7 @@ pub async fn refresh_and_save_token(id: String, refresh_token: String) {
                 updated_at: chrono::Local::now().to_rfc3339(),
             };
             let _ = repository::oauth_token::update(id, token_update);
-            println!("Success to get token! by refresh token");
+            // println!("Success to get token! by refresh token");
         }
         Err(e) => {
             println!("Recv error: {:?}", e.to_string());

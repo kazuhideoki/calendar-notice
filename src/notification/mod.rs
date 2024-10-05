@@ -4,7 +4,7 @@ use filter_upcoming_events::filter_upcoming_events;
 
 use crate::repository::{
     self,
-    models::{Event, EventFindMany, NotificationUpdate},
+    models::{Event, EventFindMany, EventUpdate},
 };
 mod filter_upcoming_events;
 
@@ -29,10 +29,10 @@ pub fn spawn_notification_cron() {
                             println!("Failed to notify event {}: {}", event.id, e)
                         });
 
-                        repository::notification::update(
+                        repository::event::update(
                             event.id.clone(),
-                            NotificationUpdate {
-                                enabled: Some(false),
+                            EventUpdate {
+                                notification_enabled: Some(false),
                                 ..Default::default()
                             },
                         )
@@ -51,8 +51,43 @@ pub fn spawn_notification_cron() {
 }
 
 fn notify(event: Event) -> Result<(), io::Error> {
-    // Zoom を開く なければ Meet を開く
+    // ビープ音を鳴らす
+    Command::new("osascript").arg("-e").arg("beep").output()?;
+
+    // イベントの内容をダイアログで表示
+    let join = "会議に参加";
+    let cancel = "キャンセル";
+    let dialog_script = format!(
+        r#"
+                tell application "System Events"
+                    set theResponse to display dialog "{}" with title "{}" buttons {{"{}","{}"}} default button "{}"
+                    set theButton to button returned of theResponse
+                    return theButton
+                end tell
+                "#,
+        event.description.unwrap_or("".to_string()),
+        event.summary.unwrap_or("[タイトル未設定]".to_string()),
+        cancel,
+        join,
+        join
+    );
+    let button_result = Command::new("osascript")
+        .arg("-e")
+        .arg(dialog_script)
+        .output()?;
+
+    // キャンセルされた場合は何もしない
+    if button_result.stdout == b"" {
+        // println!("Canceled joining the meeting");
+        return Ok(());
+    }
+
+    // Teams を開く、なければ Zoom を開く、 なければ Meet を開く
     match event {
+        Event {
+            teams_link: Some(link),
+            ..
+        } => open_with_browser(&link)?,
         Event {
             zoom_link: Some(link),
             ..
@@ -66,38 +101,25 @@ fn notify(event: Event) -> Result<(), io::Error> {
         Event {
             hangout_link: Some(link),
             ..
-        } => {
-            let script = format!(
-                r#"
-            tell application "Brave Browser"
-                activate
-                open location "{}"
-            end tell
-            "#,
-                link
-            );
-            Command::new("osascript").arg("-e").arg(script).output()?;
-        }
+        } => open_with_browser(&link)?,
         _ => {
             println!("No link for meeting found")
         }
     }
 
-    // ビープ音を鳴らす
-    Command::new("osascript").arg("-e").arg("beep").output()?;
+    Ok(())
+}
 
-    // イベントの内容をダイアログで表示
-    let dialog_script = format!(
+fn open_with_browser(link: &str) -> Result<(), io::Error> {
+    let script = format!(
         r#"
-tell app "System Events" to display dialog "{}" with title "{}"
-"#,
-        event.description.unwrap_or("".to_string()),
-        event.summary,
+        tell application "Brave Browser"
+            activate
+            open location "{}"
+        end tell
+        "#,
+        link
     );
-    Command::new("osascript")
-        .arg("-e")
-        .arg(dialog_script)
-        .output()?;
-
+    Command::new("osascript").arg("-e").arg(script).output()?;
     Ok(())
 }
