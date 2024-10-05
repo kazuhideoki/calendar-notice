@@ -1,25 +1,22 @@
-use crate::repository::models::{Event, Notification};
+use crate::repository::models::Event;
 
-pub fn filter_upcoming_events(events: Vec<(Event, Notification)>) -> Vec<Event> {
+pub fn filter_upcoming_events(events: Vec<Event>) -> Vec<Event> {
     let now = chrono::Local::now();
     let upcoming_events: Vec<Event> = events
         .into_iter()
         .filter(|event| filter_by_start_time(event, now))
-        .map(|(event, _)| event)
         .collect();
 
     upcoming_events
 }
 
 fn filter_by_start_time(
-    (
-        Event { start_datetime, .. },
-        Notification {
-            notification_sec_from_start,
-            enabled,
-            ..
-        },
-    ): &(Event, Notification),
+    Event {
+        start_datetime,
+        notification_enabled,
+        notification_sec_from_start,
+        ..
+    }: &Event,
     now: chrono::DateTime<chrono::Local>,
 ) -> bool {
     let start_time =
@@ -30,7 +27,8 @@ fn filter_by_start_time(
             )
         });
     let notification_sec_from_start = *notification_sec_from_start as i64;
-    start_time.signed_duration_since(now).num_seconds() < notification_sec_from_start && *enabled
+    start_time.signed_duration_since(now).num_seconds() < notification_sec_from_start
+        && *notification_enabled
 }
 
 #[cfg(test)]
@@ -48,46 +46,30 @@ mod tests {
             .unwrap();
         let duration = 60 * 10;
 
-        let event1 = (
-            Event {
-                start_datetime: "2023-08-01T12:10:00+09:00".to_string(), // + NOTIFICATION_INTERVAL_SEC
-                ..Default::default()
-            },
-            Notification {
-                notification_sec_from_start: duration.into(),
-                enabled: true,
-                ..Default::default()
-            },
-        );
+        let event1 = Event {
+            start_datetime: "2023-08-01T12:10:00+09:00".to_string(), // + NOTIFICATION_INTERVAL_SEC
+            notification_sec_from_start: duration.into(),
+            notification_enabled: true,
+            ..Default::default()
+        };
         let result1 = filter_by_start_time(&event1, now);
         assert_eq!(result1, false);
 
-        let event2 = (
-            Event {
-                start_datetime: "2023-08-01T12:09:59+09:00".to_string(), // + duration - 1
-
-                ..Default::default()
-            },
-            Notification {
-                notification_sec_from_start: (duration).into(),
-                enabled: true,
-                ..Default::default()
-            },
-        );
+        let event2 = Event {
+            start_datetime: "2023-08-01T12:09:59+09:00".to_string(), // + duration - 1
+            notification_sec_from_start: (duration).into(),
+            notification_enabled: true,
+            ..Default::default()
+        };
         let result2 = filter_by_start_time(&event2.into(), now);
         assert_eq!(result2, true);
 
-        let event3 = (
-            Event {
-                start_datetime: "2023-08-01T12:10:00+09:00".to_string(), // + NOTIFICATION_INTERVAL_SEC
-                ..Default::default()
-            },
-            Notification {
-                notification_sec_from_start: duration.into(),
-                enabled: false,
-                ..Default::default()
-            },
-        );
+        let event3 = Event {
+            start_datetime: "2023-08-01T12:10:00+09:00".to_string(), // + NOTIFICATION_INTERVAL_SEC
+            notification_sec_from_start: duration.into(),
+            notification_enabled: false,
+            ..Default::default()
+        };
         let result3 = filter_by_start_time(&event3, now);
         assert_eq!(result3, false);
     }
