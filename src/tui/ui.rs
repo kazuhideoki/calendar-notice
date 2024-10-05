@@ -30,7 +30,7 @@ impl UI {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?; // ここでキー入力を待つことになる。exitフラグが立つまで。なので別スレッドにしたい
+            self.wait_key_events()?;
         }
         Ok(())
     }
@@ -40,7 +40,8 @@ impl UI {
     }
 
     /// updates the application's state based on user input
-    pub fn handle_events(&mut self) -> io::Result<()> {
+    // pub fn handle_events(&mut self) -> io::Result<()> {
+    pub fn wait_key_events(&mut self) -> io::Result<bool> {
         match event::read()? {
             // it's important to check that the event is a key press event as
             // crossterm also emits key release and repeat events on Windows.
@@ -49,7 +50,7 @@ impl UI {
             }
             _ => {}
         };
-        Ok(())
+        Ok(true)
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {

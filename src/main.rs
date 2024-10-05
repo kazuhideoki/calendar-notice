@@ -30,6 +30,7 @@ improvement..
 - summary がない時もある タイトルなしの時
 - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
 - module整理 + テスト追加
+- 接続がないときに panic になってしまうことへの対応
 */
 #[tokio::main]
 async fn main() {
