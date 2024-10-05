@@ -333,28 +333,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
             .items
             .iter()
             .find(|e| e.id == event.id)
-            .map(|e| EventUpdate {
-                summary: Some(e.summary.clone()),
-                description: e.description.clone(),
-                status: Some(
-                    e.status
-                        .as_ref()
-                        .unwrap_or(&EventStatus::Unknown)
-                        .to_string(),
-                ),
-                hangout_link: e.hangout_link.clone(),
-                zoom_link: match e.description {
-                    Some(ref description) => extract_zoom_link(description),
-                    None => None,
-                },
-                teams_link: match e.description {
-                    Some(ref description) => extract_teams_link(description),
-                    None => None,
-                },
-                start_datetime: Some(e.start.date_time.clone().unwrap()),
-                end_datetime: Some(e.end.date_time.clone().unwrap()),
-                ..Default::default()
-            })
+            .map(EventUpdate::from)
             .expect("EventUpdate must be created");
         let _ = repository::event::update(event.id.clone(), event_update);
     }
@@ -368,39 +347,7 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
 
     let event_creates: Vec<Event> = new_google_calendar_events
         .clone()
-        .map(|event| Event {
-            id: event.id.clone(),
-            summary: Some(event.summary.clone()),
-            description: event.description.clone(),
-            status: Some(
-                event
-                    .status
-                    .as_ref()
-                    .unwrap_or(&EventStatus::Unknown)
-                    .to_string(),
-            ),
-            hangout_link: event.hangout_link.clone(),
-            zoom_link: match event.description {
-                Some(ref description) => extract_zoom_link(description),
-                None => None,
-            },
-            teams_link: match event.description {
-                Some(ref description) => extract_teams_link(description),
-                None => None,
-            },
-            start_datetime: event
-                .start
-                .date_time
-                .clone()
-                .expect("start_datetime must exist"),
-            end_datetime: event
-                .end
-                .date_time
-                .clone()
-                .expect("end_datetime must exist"),
-            notification_enabled: true,
-            notification_sec_from_start: 60 * 10,
-        })
+        .map(Event::from)
         .collect();
     let event_result = repository::event::create_many(event_creates);
     if let Err(e) = event_result {
