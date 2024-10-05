@@ -1,23 +1,30 @@
 use chrono::prelude::*;
-use tokio::spawn;
+use std::{
+    io,
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
+    time::Duration,
+};
 // ANCHOR: imports
-use std::io;
 
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Rect},
     style::{Color, Style, Stylize},
     symbols::border,
-    text::{Line, Text},
+    text::Line,
     widgets::{
         block::{Position, Title},
-        Block, Cell, Paragraph, Row, Table, Widget,
+        Block, Cell, Row, Table, Widget,
     },
     DefaultTerminal, Frame,
 };
 
-use crate::repository;
+use crate::repository::{self, models};
+
+// const UI_REFRESH_INTERVAL_SEC: u64 = 60; // TODO
+const UI_REFRESH_INTERVAL_SEC: u64 = 5;
 
 #[derive(Default)]
 pub struct UI {
@@ -26,54 +33,74 @@ pub struct UI {
     pub exit: bool,
 }
 impl UI {
-    /// runs the application's main loop until the user quits
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while !self.exit {
+    pub fn run(
+        &mut self,
+        terminal: &mut DefaultTerminal,
+        fetch_events: fn() -> Vec<models::Event>,
+    ) -> io::Result<()> {
+        // イベント更新用のチャンネルを設定
+        let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
+
+        // 定期的なイベント更新を行うバックグラウンドスレッドを起動
+        thread::spawn(move || loop {
+            thread::sleep(Duration::from_secs(UI_REFRESH_INTERVAL_SEC));
+            if tx.send(()).is_err() {
+                break; // メインスレッドが終了した場合にループを抜ける
+            }
+        });
+
+        loop {
+            // 終了フラグが立っていたらループを抜ける
+            if self.exit {
+                break;
+            }
+
+            // キー入力イベントをノンブロッキングでチェック
+            if event::poll(Duration::from_millis(100)).unwrap() {
+                self.handle_key_events()?;
+            }
+
+            // 定期的なイベント更新をチェック
+            if rx.try_recv().is_ok() {
+                let events = fetch_events();
+                self.events = events;
+            }
+
+            // 現在の UI 状態に基づいて画面を描画
             terminal.draw(|frame| self.draw(frame))?;
-            self.wait_key_events()?;
         }
+
         Ok(())
     }
 
-    pub fn draw(&self, frame: &mut Frame) {
+    fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
     }
 
-    /// updates the application's state based on user input
-    // pub fn handle_events(&mut self) -> io::Result<()> {
-    pub fn wait_key_events(&mut self) -> io::Result<bool> {
+    fn handle_key_events(&mut self) -> io::Result<bool> {
         match event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
+                match key_event.code {
+                    KeyCode::Char(c) if c.is_ascii_digit() => {
+                        let num = c.to_digit(10).unwrap_or(0);
+                        if num > 0 && num <= self.events.len() as u32 {
+                            self.selected_event_id = Some(self.events[num as usize - 1].id.clone());
+                        }
+                    }
+                    KeyCode::Char('q') => {
+                        self.selected_event_id = None;
+                        self.exit()
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         };
         Ok(true)
     }
 
-    fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char(c) if c.is_ascii_digit() => {
-                let num = c.to_digit(10).unwrap();
-                if num <= self.events.len() as u32 {
-                    self.selected_event_id = Some(self.events[num as usize - 1].id.clone());
-                }
-            }
-            KeyCode::Char('q') => {
-                self.selected_event_id = None;
-                self.exit()
-            }
-            _ => {}
-        }
-    }
-
-    pub fn exit(&mut self) {
+    fn exit(&mut self) {
         self.exit = true;
-    }
-    pub fn restart(&mut self) {
-        self.exit = false;
     }
 }
 

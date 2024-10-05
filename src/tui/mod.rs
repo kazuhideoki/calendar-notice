@@ -1,11 +1,4 @@
-use std::{
-    sync::mpsc::{self, Receiver, Sender},
-    thread,
-    time::Duration,
-};
-
 use chrono::Timelike;
-use crossterm::event::{self, Event, KeyCode};
 use ui::UI;
 
 use crate::repository::{
@@ -15,52 +8,20 @@ use crate::repository::{
 
 mod ui;
 
-const UI_REFRESH_INTERVAL_SEC: u64 = 3;
-
 pub fn show_tui() {
-    let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
     let mut terminal = ratatui::init();
-    let events = fetch_today_event();
+    let events = fetch_today_events();
     let mut ui = UI {
         events,
         ..Default::default()
     };
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(UI_REFRESH_INTERVAL_SEC));
-        tx.send(()).unwrap();
-    });
-
-    loop {
-        if ui.exit {
-            break;
-        }
-
-        if event::poll(Duration::from_millis(100)).unwrap() {
-            if let Event::Key(key) = event::read().unwrap() {
-                match key.code {
-                    KeyCode::Char('q') => ui.exit = true,
-                    // 他のキー入力の処理をここに追加
-                    _ => {}
-                }
-            }
-        }
-
-        if rx.try_recv().is_ok() {
-            let events = fetch_today_event();
-            ui = UI {
-                events,
-                ..Default::default()
-            };
-        }
-
-        terminal.draw(|frame| ui.draw(frame)).unwrap();
-    }
+    let _ = ui.run(&mut terminal, fetch_today_events);
 
     ratatui::restore();
 }
 
-fn fetch_today_event() -> Vec<models::Event> {
+fn fetch_today_events() -> Vec<models::Event> {
     let start_of_today = chrono::Local::now()
         .with_hour(0)
         .unwrap()
