@@ -121,7 +121,7 @@ impl Widget for &UI {
             )
             .border_set(border::THICK);
 
-        let header_cells = ["No.", "日付", "説明"]
+        let header_cells = ["No.", "Start", "Summary", "Join", "Notify"]
             .iter()
             .map(|h| Cell::from(*h).style(Style::default().fg(Color::Yellow)));
         let header = Row::new(header_cells).style(Style::default().bg(Color::DarkGray));
@@ -131,13 +131,23 @@ impl Widget for &UI {
                 .expect("Invalid datetime format");
             let cells = [
                 Cell::from((index + 1).to_string()),
-                Cell::from(datetime.format("%m-%d %H-%M").to_string()),
+                Cell::from(datetime.format("%m-%d %H:%M").to_string()),
                 Cell::from(
                     event
+                        .clone()
                         .summary
                         .clone()
                         .unwrap_or("[タイトル未設定]".to_string()),
                 ),
+                Cell::from(event.status.clone().unwrap_or("".to_string())),
+                Cell::from({
+                    let enabled = event.notification_enabled.clone();
+                    if enabled {
+                        "✅".to_string()
+                    } else {
+                        "⏹️".to_string()
+                    }
+                }),
             ];
 
             Row::new(cells)
@@ -146,9 +156,11 @@ impl Widget for &UI {
         let table = Table::new(
             rows,
             &[
-                Constraint::Length(5),
+                Constraint::Length(3),
                 Constraint::Length(15),
                 Constraint::Percentage(80),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
             ],
         )
         .header(header)
