@@ -50,6 +50,7 @@ pub fn spawn_notification_cron() {
     });
 }
 
+// TODO リンク無いときは通知のみにする
 fn notify(event: Event) -> Result<(), io::Error> {
     // ビープ音を鳴らす
     Command::new("osascript").arg("-e").arg("beep").output()?;
@@ -103,7 +104,7 @@ fn notify(event: Event) -> Result<(), io::Error> {
             ..
         } => open_with_browser(&link)?,
         _ => {
-            println!("No link for meeting found")
+            // println!("No link for meeting found")
         }
     }
 

@@ -106,7 +106,8 @@ impl UI {
 
 impl Widget for &UI {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Title::from(" 本日の予定 ".bold());
+        let today = Local::now().format("%m月 %-d日").to_string();
+        let title = Title::from(format!(" 本日: {} の予定 ", today).bold());
         let instructions = Title::from(Line::from(vec![
             // TODO ショートカットキーの説明を追加
             " Quit ".into(),
@@ -131,7 +132,7 @@ impl Widget for &UI {
                 .expect("Invalid datetime format");
             let cells = [
                 Cell::from((index + 1).to_string()),
-                Cell::from(datetime.format("%m-%d %H:%M").to_string()),
+                Cell::from(datetime.format("%H時 %M分").to_string()),
                 Cell::from(
                     event
                         .clone()
