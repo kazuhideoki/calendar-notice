@@ -2,6 +2,9 @@ use std::fmt;
 use std::thread;
 use std::time::Duration;
 
+use chrono::DateTime;
+use chrono::Local;
+use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
 use crate::{
@@ -215,8 +218,8 @@ impl From<InvalidHeaderValue> for Error {
 
 const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 // TODO 扱う期間を const or env 化
-const FROM_SUB_SEC: u16 = 60 * 10;
-const TO_ADD_DAYS: u8 = 3;
+const SYNC_CALENDAR_FROM_SUB_SEC: u16 = 60 * 10;
+const SYNC_CALENDAR_TO_ADD_DAYS: u8 = 3;
 
 pub fn spawn_sync_calendar_cron() {
     tokio::spawn(async {
@@ -266,11 +269,15 @@ pub fn spawn_sync_calendar_cron() {
 }
 
 pub async fn sync_events(oauth_token: OAuthToken) -> Result<(), Error> {
+    let now = chrono::Local::now();
+    let from = now - chrono::Duration::minutes(SYNC_CALENDAR_FROM_SUB_SEC.into());
+    let to = now + chrono::Duration::days(SYNC_CALENDAR_TO_ADD_DAYS.into());
+
     let google_calendar_result =
-        google_calendar::list_events(oauth_token.access_token.clone()).await;
+        google_calendar::list_events(oauth_token.access_token.clone(), from, to).await;
     let google_calendar_parent =
         handle_google_calendar_event_result(google_calendar_result, oauth_token.clone()).await?;
-    let _ = update_events(google_calendar_parent);
+    let _ = update_events(google_calendar_parent, from, to);
 
     Ok(())
 }
@@ -299,7 +306,11 @@ pub async fn handle_google_calendar_event_result(
     }
 }
 
-pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(), String> {
+pub fn update_events(
+    google_calendar_parent: GoogleCalendarParent,
+    from: chrono::DateTime<chrono::Local>,
+    to: chrono::DateTime<chrono::Local>,
+) -> Result<(), String> {
     // println!(
     //     "fetched google calendar events: {:?}",
     //     google_calendar_parent
@@ -309,14 +320,9 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
     //         .collect::<Vec<&String>>()
     // );
 
-    let duplicated_events = repository::event::find_many(EventFindMany {
-        ids_in: Some(
-            google_calendar_parent
-                .items
-                .iter()
-                .map(|event| event.id.clone())
-                .collect(),
-        ),
+    let events = repository::event::find_many(EventFindMany {
+        from: Some(from.to_rfc3339()),
+        to: Some(to.to_rfc3339()),
         ..Default::default()
     })
     .unwrap_or_else(|e| {
@@ -327,29 +333,42 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
         vec![]
     });
 
-    // すでに存在するイベントは、events を更新する
-    for event in &duplicated_events {
-        let event_update: EventUpdate = google_calendar_parent
+    let mut existing_events: Vec<&GoogleCalendarEvent> = vec![];
+    let mut deleting_events: Vec<&Event> = vec![];
+    let mut adding_events: Vec<&GoogleCalendarEvent> = vec![];
+    for event in &events {
+        let existing_event = google_calendar_parent
             .items
             .iter()
-            .find(|e| e.id == event.id)
-            .map(EventUpdate::from)
-            .expect("EventUpdate must be created");
-        let _ = repository::event::update(event.id.clone(), event_update);
+            .find(|e| e.id == event.id);
+        if let Some(google_calendar_event) = existing_event {
+            existing_events.push(google_calendar_event);
+        }
+
+        if existing_event.is_none() {
+            deleting_events.push(event);
+        }
+    }
+    for google_calendar_event in &google_calendar_parent.items {
+        let existing_event = events.iter().find(|e| e.id == google_calendar_event.id);
+        if existing_event.is_none() {
+            adding_events.push(google_calendar_event);
+        }
     }
 
-    // 新規イベントは、events を作成する
-    let new_google_calendar_events = google_calendar_parent.items.iter().filter(|event| {
-        !duplicated_events
-            .iter()
-            .any(|duplicated_event| duplicated_event.id == event.id)
-    });
+    // 更新
+    for event in existing_events {
+        let event_update: EventUpdate = EventUpdate::from(event);
+        let _ = repository::event::update(event.id.clone(), event_update);
+    }
+    // 削除
+    for event in deleting_events {
+        let _ = repository::event::delete(event.id.clone());
+    }
+    // 作成
+    let event_result =
+        repository::event::create_many(adding_events.iter().map(|e| Event::from(*e)).collect());
 
-    let event_creates: Vec<Event> = new_google_calendar_events
-        .clone()
-        .map(Event::from)
-        .collect();
-    let event_result = repository::event::create_many(event_creates);
     if let Err(e) = event_result {
         return Err(format!("Failed to create events: {:?}", e).to_string());
     }
@@ -359,7 +378,11 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
 
 // TODO 期間をクエリパラメータで指定できるようにする
 // TODO item だけ返却でも良いのでは？
-pub async fn list_events(access_token: String) -> Result<GoogleCalendarParent, Error> {
+pub async fn list_events(
+    access_token: String,
+    from: DateTime<Local>,
+    to: DateTime<Local>,
+) -> Result<GoogleCalendarParent, Error> {
     let url = format!(
         "https://www.googleapis.com/calendar/v3/calendars/{}/events",
         "primary"
@@ -379,14 +402,8 @@ pub async fn list_events(access_token: String) -> Result<GoogleCalendarParent, E
             ("maxResults", "10"),
             ("orderBy", "startTime"),
             ("singleEvents", "true"),
-            (
-                "timeMin",
-                &(now - chrono::Duration::minutes(FROM_SUB_SEC.into())).to_rfc3339(),
-            ),
-            (
-                "timeMax",
-                &(now + chrono::Duration::days(TO_ADD_DAYS.into())).to_rfc3339(),
-            ),
+            ("timeMin", &from.to_rfc3339()),
+            ("timeMax", &to.to_rfc3339()),
         ])
         .send()
         .await?;

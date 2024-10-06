@@ -108,6 +108,16 @@ pub mod event {
             Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
         }
     }
+
+    pub fn delete(id: String) -> Result<(), std::io::Error> {
+        let result = diesel::delete(events::table.find(id)).execute(&mut super::get_connection());
+
+        match result {
+            Ok(_) => Ok(()),
+            // TODO エラー定義
+            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+        }
+    }
 }
 
 pub mod oauth_token {
