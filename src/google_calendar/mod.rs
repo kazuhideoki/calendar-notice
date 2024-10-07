@@ -2,14 +2,13 @@ use std::fmt;
 use std::thread;
 use std::time::Duration;
 
-use chrono::DateTime;
-use chrono::Local;
-use chrono::Utc;
-use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
+use reqwest::header::InvalidHeaderValue;
 
+use crate::oauth::is_token_expired::is_token_expired;
+use crate::oauth::refresh_and_save_token;
+use crate::oauth::to_oauth_on_browser;
 use crate::{
     google_calendar::{self},
-    oauth::{self, is_token_expired::is_token_expired, refresh_and_save_token},
     repository::{
         self,
         models::{Event, EventFindMany, EventUpdate, OAuthToken},
@@ -22,6 +21,7 @@ mod extract_zoom_link;
 pub use self::extract_zoom_link::extract_zoom_link;
 mod extract_teams_link;
 pub use self::extract_teams_link::extract_teams_link;
+mod google_calendar_api;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleCalendarParent {
@@ -217,6 +217,7 @@ impl From<InvalidHeaderValue> for Error {
 }
 
 const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
+// const SYNC_CALENDAR_INTERVAL_SEC: u16 = 5;
 // TODO 扱う期間を const or env 化
 const SYNC_CALENDAR_FROM_SUB_SEC: u16 = 60 * 10;
 const SYNC_CALENDAR_TO_ADD_DAYS: u8 = 3;
@@ -259,7 +260,7 @@ pub fn spawn_sync_calendar_cron() {
                 None => {
                     // println!("OAuth token is not found. Please authenticate ");
                     // TODO 認証完了まで、次のループで再度認証催促が発生するのを防ぐ？
-                    oauth::to_oauth_on_browser();
+                    to_oauth_on_browser();
                 }
             }
 
@@ -274,7 +275,7 @@ pub async fn sync_events(oauth_token: OAuthToken) -> Result<(), Error> {
     let to = now + chrono::Duration::days(SYNC_CALENDAR_TO_ADD_DAYS.into());
 
     let google_calendar_result =
-        google_calendar::list_events(oauth_token.access_token.clone(), from, to).await;
+        google_calendar_api::list_events(oauth_token.access_token.clone(), from, to).await;
     let google_calendar_parent =
         handle_google_calendar_event_result(google_calendar_result, oauth_token.clone()).await?;
     let _ = update_events(google_calendar_parent, from, to);
@@ -374,48 +375,4 @@ pub fn update_events(
     }
 
     Ok(())
-}
-
-// TODO 期間をクエリパラメータで指定できるようにする
-// TODO item だけ返却でも良いのでは？
-pub async fn list_events(
-    access_token: String,
-    from: DateTime<Local>,
-    to: DateTime<Local>,
-) -> Result<GoogleCalendarParent, Error> {
-    let url = format!(
-        "https://www.googleapis.com/calendar/v3/calendars/{}/events",
-        "primary"
-    );
-
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        "AUTHORIZATION",
-        HeaderValue::from_str(&format!("Bearer {}", access_token))?,
-    );
-
-    let now = chrono::Utc::now();
-    let response = reqwest::Client::new()
-        .get(&url)
-        .headers(headers)
-        .query(&[
-            ("maxResults", "10"),
-            ("orderBy", "startTime"),
-            ("singleEvents", "true"),
-            ("timeMin", &from.to_rfc3339()),
-            ("timeMax", &to.to_rfc3339()),
-        ])
-        .send()
-        .await?;
-    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
-        // println!("Unauthorized when requesting list events");
-        return Err(Error::Unauthorized);
-    }
-
-    let text = response.text().await?;
-    // println!("🔶 text: {:?}", text);
-    let google_calendar_parent: GoogleCalendarParent =
-        serde_json::from_str(&text).map_err(|e| Error::Parse(e.to_string()))?;
-    // println!("🔵 google_calendar_parent: {:?}", google_calendar_parent);
-    Ok(google_calendar_parent)
 }

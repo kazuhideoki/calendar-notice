@@ -99,6 +99,13 @@ impl UI {
         Ok(true)
     }
 
+    fn get_event_num(&self, id: &String) -> usize {
+        self.events.iter().position(|event| event.id == *id).expect(
+            "
+            Event not found",
+        ) + 1
+    }
+
     fn exit(&mut self) {
         self.exit = true;
     }
@@ -108,8 +115,18 @@ impl Widget for &UI {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let today = Local::now().format("%m月 %-d日").to_string();
         let title = Title::from(format!(" 本日: {} の予定 ", today).bold());
+        // TODO ショートカットキーの説明を追加
         let instructions = Title::from(Line::from(vec![
-            // TODO ショートカットキーの説明を追加
+            self.selected_event_id
+                .as_ref()
+                .map_or("イベントを選択: 数字キー".to_string(), |id| {
+                    format!(
+                        "イベントを選択: 数字キー, 選択中: {}",
+                        self.get_event_num(id)
+                    )
+                    .to_string()
+                })
+                .into(),
             " Quit ".into(),
             "<Q> ".blue().bold(),
         ]));
