@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use reqwest::header::InvalidHeaderValue;
 
+use crate::env::Env;
 use crate::oauth::is_token_expired::is_token_expired;
 use crate::oauth::refresh_and_save_token;
 use crate::oauth::to_oauth_on_browser;
@@ -220,7 +221,6 @@ const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 // const SYNC_CALENDAR_INTERVAL_SEC: u16 = 5;
 // TODO 扱う期間を const or env 化
 const SYNC_CALENDAR_FROM_SUB_SEC: u16 = 60 * 10;
-const SYNC_CALENDAR_TO_ADD_DAYS: u8 = 3;
 
 pub fn spawn_sync_calendar_cron() {
     tokio::spawn(async {
@@ -270,9 +270,10 @@ pub fn spawn_sync_calendar_cron() {
 }
 
 pub async fn sync_events(oauth_token: OAuthToken) -> Result<(), Error> {
+    let env = Env::new();
     let now = chrono::Local::now();
     let from = now - chrono::Duration::minutes(SYNC_CALENDAR_FROM_SUB_SEC.into());
-    let to = now + chrono::Duration::days(SYNC_CALENDAR_TO_ADD_DAYS.into());
+    let to = now + chrono::Duration::days(env.event_period.into());
 
     let google_calendar_result =
         google_calendar_api::list_events(oauth_token.access_token.clone(), from, to).await;

@@ -1,18 +1,25 @@
 use chrono::Timelike;
 use ui::UI;
 
-use crate::repository::{
-    self,
-    models::{self, EventFindMany},
+use crate::{
+    env::Env,
+    repository::{
+        self,
+        models::{self, EventFindMany},
+    },
 };
 
 mod ui;
 
 pub fn show_tui() {
+    let env = Env::new();
     let mut terminal = ratatui::init();
-    let events = fetch_today_events();
+    let selected_day: u32 = 1;
+    let events = fetch_today_events(selected_day);
     let mut ui = UI {
         events,
+        selected_day,
+        event_period: env.event_period,
         ..Default::default()
     };
 
@@ -21,19 +28,19 @@ pub fn show_tui() {
     ratatui::restore();
 }
 
-fn fetch_today_events() -> Vec<models::Event> {
-    let start_of_today = chrono::Local::now()
+fn fetch_today_events(event_period: u32) -> Vec<models::Event> {
+    let start_day = chrono::Local::now()
         .with_hour(0)
         .unwrap()
         .with_minute(0)
         .unwrap()
         .with_second(0)
         .unwrap();
-    let tomorrow = start_of_today + chrono::Duration::days(1);
+    let end_day = start_day + chrono::Duration::days(event_period as i64);
 
     let events = repository::event::find_many(EventFindMany {
-        from: Some(start_of_today.to_rfc3339()),
-        to: Some(tomorrow.to_rfc3339()),
+        from: Some(start_day.to_rfc3339()),
+        to: Some(end_day.to_rfc3339()),
         ..Default::default()
     })
     .expect("Failed to find events.")

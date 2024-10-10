@@ -24,19 +24,21 @@ use ratatui::{
 use crate::repository::{self, models};
 
 // const UI_REFRESH_INTERVAL_SEC: u64 = 60; // TODO
-const UI_REFRESH_INTERVAL_SEC: u64 = 5;
+const UI_REFRESH_INTERVAL_SEC: u64 = 1; // TODO もっと効率的な方法にする。今は1秒ごとに DB アクセスしてしまっている
 
 #[derive(Default)]
 pub struct UI {
     pub events: Vec<repository::models::Event>,
     pub selected_event_id: Option<String>,
+    pub selected_day: u32,
     pub exit: bool,
+    pub event_period: u32,
 }
 impl UI {
     pub fn run(
         &mut self,
         terminal: &mut DefaultTerminal,
-        fetch_events: fn() -> Vec<models::Event>,
+        fetch_events: fn(selected_day: u32) -> Vec<models::Event>,
     ) -> io::Result<()> {
         // イベント更新用のチャンネルを設定
         let (tx, rx): (Sender<()>, Receiver<()>) = mpsc::channel();
@@ -62,7 +64,7 @@ impl UI {
 
             // 定期的なイベント更新をチェック
             if rx.try_recv().is_ok() {
-                let events = fetch_events();
+                let events = fetch_events(self.selected_day);
                 self.events = events;
             }
 
@@ -91,6 +93,21 @@ impl UI {
                         self.selected_event_id = None;
                         self.exit()
                     }
+                    // 左右のキーで selected_day を変更する 1~7の間のループ
+                    KeyCode::Left => {
+                        if self.selected_day == 1 {
+                            self.selected_day = self.event_period;
+                        } else {
+                            self.selected_day -= 1;
+                        }
+                    }
+                    KeyCode::Right => {
+                        if self.selected_day == self.event_period {
+                            self.selected_day = 1;
+                        } else {
+                            self.selected_day += 1;
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -113,7 +130,8 @@ impl UI {
 
 impl Widget for &UI {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let today = Local::now().format("%m月 %-d日").to_string();
+        let day = Local::now() + chrono::Duration::days((self.selected_day - 1) as i64);
+        let today = day.format("%m月 %-d日").to_string();
         let title = Title::from(format!(" 本日: {} の予定 ", today).bold());
         // TODO ショートカットキーの説明を追加
         let instructions = Title::from(Line::from(vec![
@@ -144,7 +162,21 @@ impl Widget for &UI {
             .map(|h| Cell::from(*h).style(Style::default().fg(Color::Yellow)));
         let header = Row::new(header_cells).style(Style::default().bg(Color::DarkGray));
 
-        let rows = self.events.iter().enumerate().map(|(index, event)| {
+        let today = chrono::Local::now().date_naive();
+
+        let target_date = today + chrono::Duration::days((self.selected_day - 1) as i64);
+        let target_events = self
+            .events
+            .iter()
+            .filter(|event| {
+                let start_time = DateTime::parse_from_rfc3339(&event.start_datetime)
+                    .expect("Invalid datetime format")
+                    .date_naive();
+
+                start_time == target_date
+            })
+            .collect::<Vec<_>>();
+        let rows = target_events.iter().enumerate().map(|(index, event)| {
             let start_time = DateTime::parse_from_rfc3339(&event.start_datetime)
                 .expect("Invalid datetime format");
             let end_time =
