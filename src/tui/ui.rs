@@ -145,11 +145,18 @@ impl Widget for &UI {
         let header = Row::new(header_cells).style(Style::default().bg(Color::DarkGray));
 
         let rows = self.events.iter().enumerate().map(|(index, event)| {
-            let datetime = DateTime::parse_from_rfc3339(&event.start_datetime)
+            let start_time = DateTime::parse_from_rfc3339(&event.start_datetime)
                 .expect("Invalid datetime format");
+            let end_time =
+                DateTime::parse_from_rfc3339(&event.end_datetime).expect("Invalid datetime format");
+            let duratino_min = end_time.signed_duration_since(start_time).num_minutes();
             let cells = [
                 Cell::from((index + 1).to_string()),
-                Cell::from(datetime.format("%H時 %M分").to_string()),
+                Cell::from(format!(
+                    "{}~ ({}分)",
+                    start_time.format("%H:%M").to_string(),
+                    duratino_min
+                )),
                 Cell::from(
                     event
                         .clone()

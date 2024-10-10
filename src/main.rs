@@ -13,11 +13,11 @@ use oauth::spawn_redirect_server;
 use tui::show_tui;
 
 /**
-functoin..
-- TUI での操作
-  - 次の日の予定を表示
-  - 詳細など情報表示
-- TUI にログ表示
+TUI
+- ログ表示
+- 予定間の時間の表現
+- 次の日の予定を表示
+- 詳細など情報表示
 
 improvement..
 - 各ファイルの エラーハンドリング。必要最低限のエラー定義(なければ Stringで)。呼び出し元でログor分岐
