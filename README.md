@@ -32,3 +32,13 @@ diesel setup
 ```
 cargo run
 ```
+
+TUI を表示せずデーモンとして起動する場合は以下のようにします。
+
+```
+cargo run -- --daemon
+```
+
+`--daemon` オプションはバックグラウンド実行向けで、Ctrl+C で終了できます。
+
+`docs/systemd/calendar-notice.service` に `systemd` 用のサービス例を用意しています。

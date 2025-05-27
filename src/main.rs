@@ -7,10 +7,17 @@ mod repository;
 mod schema;
 mod tui;
 
+use clap::Parser;
 use google_calendar::spawn_sync_calendar_cron;
 use notification::spawn_notification_cron;
 use oauth::spawn_redirect_server;
 use tui::show_tui;
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(long)]
+    daemon: bool,
+}
 
 /**
 functoin..
@@ -31,11 +38,19 @@ improvement..
 */
 #[tokio::main]
 async fn main() {
+    let cli = Cli::parse();
+
     spawn_redirect_server();
 
     spawn_notification_cron();
 
     spawn_sync_calendar_cron();
 
-    show_tui();
+    if !cli.daemon {
+        show_tui();
+    } else {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to listen for ctrl_c");
+    }
 }
