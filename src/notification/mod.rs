@@ -1,4 +1,6 @@
 use std::{io, process::Command};
+use tokio::task::JoinHandle;
+use tokio::sync::watch::Receiver;
 
 use filter_upcoming_events::filter_upcoming_events;
 
@@ -11,9 +13,14 @@ mod filter_upcoming_events;
 const NOTIFICATION_INTERVAL_SEC: u16 = 60;
 pub const NOTIFICATION_PERIOD_DAYS: i64 = 7;
 
-pub fn spawn_notification_cron() {
-    tokio::spawn(async {
+pub fn spawn_notification_cron(mut shutdown_rx: Receiver<bool>) -> JoinHandle<()> {
+    tokio::spawn(async move {
         loop {
+            // シャットダウンシグナルをチェック
+            if *shutdown_rx.borrow() {
+                break;
+            }
+
             let now = chrono::Local::now();
             let events = repository::event::find_many(EventFindMany {
                 from: Some(now.to_rfc3339()),
@@ -42,12 +49,17 @@ pub fn spawn_notification_cron() {
                 Err(e) => println!("Failed to get events: {:?}", e),
             }
 
-            tokio::time::sleep(tokio::time::Duration::from_secs(
-                NOTIFICATION_INTERVAL_SEC.into(),
-            ))
-            .await;
+            // sleep 中でもシャットダウンシグナルを受け取れるようにする
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_secs(NOTIFICATION_INTERVAL_SEC.into())) => {},
+                _ = shutdown_rx.changed() => {
+                    if *shutdown_rx.borrow() {
+                        break;
+                    }
+                }
+            }
         }
-    });
+    })
 }
 
 fn notify(event: Event) -> Result<(), io::Error> {

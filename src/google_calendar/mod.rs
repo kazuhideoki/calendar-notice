@@ -1,6 +1,7 @@
 use std::fmt;
-use std::thread;
 use std::time::Duration;
+use tokio::task::JoinHandle;
+use tokio::sync::watch::Receiver;
 
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
@@ -218,9 +219,14 @@ const SYNC_CALENDAR_INTERVAL_SEC: u16 = 60 * 10;
 const FROM_SUB_SEC: u16 = 60 * 10;
 const TO_ADD_DAYS: u8 = 3;
 
-pub fn spawn_sync_calendar_cron() {
-    tokio::spawn(async {
+pub fn spawn_sync_calendar_cron(mut shutdown_rx: Receiver<bool>) -> JoinHandle<()> {
+    tokio::spawn(async move {
         loop {
+            // シャットダウンシグナルをチェック
+            if *shutdown_rx.borrow() {
+                break;
+            }
+
             let latest_token = repository::oauth_token::find_latest().unwrap_or_else(|e| {
                 panic!(
                     "Failed to get latest token in run_sync_calendar_cron_thread: {:?}",
@@ -260,9 +266,17 @@ pub fn spawn_sync_calendar_cron() {
                 }
             }
 
-            thread::sleep(Duration::from_secs(SYNC_CALENDAR_INTERVAL_SEC.into()));
+            // sleep 中でもシャットダウンシグナルを受け取れるようにする
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(SYNC_CALENDAR_INTERVAL_SEC.into())) => {},
+                _ = shutdown_rx.changed() => {
+                    if *shutdown_rx.borrow() {
+                        break;
+                    }
+                }
+            }
         }
-    });
+    })
 }
 
 pub async fn sync_events(oauth_token: OAuthToken) -> Result<(), Error> {

@@ -40,17 +40,30 @@ improvement..
 async fn main() {
     let cli = Cli::parse();
 
-    spawn_redirect_server();
+    // シャットダウンシグナル用のチャンネルを作成
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
-    spawn_notification_cron();
-
-    spawn_sync_calendar_cron();
+    // 各タスクにシャットダウンレシーバーを渡す
+    let server_handle = spawn_redirect_server(shutdown_rx.clone());
+    let notification_handle = spawn_notification_cron(shutdown_rx.clone());
+    let sync_handle = spawn_sync_calendar_cron(shutdown_rx.clone());
 
     if !cli.daemon {
-        show_tui();
+        show_tui(shutdown_tx.clone());
     } else {
+        // Ctrl-C を待機
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for ctrl_c");
+        
+        println!("Shutting down...");
     }
+
+    // シャットダウンシグナルを送信
+    let _ = shutdown_tx.send(true);
+
+    // すべてのタスクの終了を待つ
+    let _ = tokio::join!(server_handle, notification_handle, sync_handle);
+    
+    println!("Shutdown complete");
 }
