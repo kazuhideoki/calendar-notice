@@ -55,7 +55,7 @@ async fn main() {
         tokio::signal::ctrl_c()
             .await
             .expect("failed to listen for ctrl_c");
-        
+
         println!("Shutting down...");
     }
 
@@ -64,6 +64,6 @@ async fn main() {
 
     // すべてのタスクの終了を待つ
     let _ = tokio::join!(server_handle, notification_handle, sync_handle);
-    
+
     println!("Shutdown complete");
 }

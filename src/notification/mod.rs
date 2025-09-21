@@ -1,6 +1,6 @@
 use std::{io, process::Command};
-use tokio::task::JoinHandle;
 use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 
 use filter_upcoming_events::filter_upcoming_events;
 

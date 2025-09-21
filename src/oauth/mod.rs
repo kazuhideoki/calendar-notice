@@ -3,8 +3,8 @@ mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{collections::HashMap, thread, time::Duration};
-use tokio::task::JoinHandle;
 use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 use warp::Filter;
 
 use serde::{Deserialize, Serialize};
@@ -69,11 +69,11 @@ pub fn spawn_redirect_server(mut shutdown_rx: Receiver<bool>) -> JoinHandle<()> 
             .and_then(handle_oauth_redirect);
 
         // println!("HTTP server starting at {}", port.clone());
-        let (_, server) = warp::serve(routes)
-            .bind_with_graceful_shutdown(([127, 0, 0, 1], port), async move {
+        let (_, server) =
+            warp::serve(routes).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async move {
                 let _ = shutdown_rx.changed().await;
             });
-        
+
         server.await;
     })
 }

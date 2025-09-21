@@ -1,7 +1,7 @@
 use std::fmt;
 use std::time::Duration;
-use tokio::task::JoinHandle;
 use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 
 use reqwest::header::{HeaderMap, HeaderValue, InvalidHeaderValue};
 
@@ -197,6 +197,17 @@ pub struct ConferenceSolutionKey {
     type_: String,
 }
 
+fn resolve_event_datetime(event_datetime: &EventDateTime) -> Option<String> {
+    if let Some(date_time) = &event_datetime.date_time {
+        Some(date_time.clone())
+    } else if let Some(date) = &event_datetime.date {
+        // All-day events only provide the date; normalizing to UTC midnight keeps downstream parsing simple.
+        Some(format!("{}T00:00:00Z", date))
+    } else {
+        None
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     Reqwest(reqwest::Error),
@@ -236,20 +247,40 @@ pub fn spawn_sync_calendar_cron(mut shutdown_rx: Receiver<bool>) -> JoinHandle<(
 
             match latest_token {
                 Some(oauth_token) if is_token_expired(&oauth_token, chrono::Local::now()) => {
-                    refresh_and_save_token(
-                        oauth_token.id.clone(),
-                        oauth_token.refresh_token.clone().unwrap(),
-                    )
-                    .await;
+                    match oauth_token.refresh_token.clone() {
+                        Some(refresh_token) => {
+                            refresh_and_save_token(oauth_token.id.clone(), refresh_token).await;
 
-                    let _ =
-                        repository::oauth_token::find_latest().expect("new token must be found");
-                    sync_events(oauth_token).await.unwrap_or_else(|_| {
-                        // println!(
-                        //     "Failed to sync events in run_sync_calendar_cron_thread with new token: {:?}",
-                        //     e
-                        // )
-                    });
+                            match repository::oauth_token::find_latest() {
+                                Ok(Some(updated_token)) => {
+                                    sync_events(updated_token).await.unwrap_or_else(|e| {
+                                        println!(
+                                            "Failed to sync events after refreshing token: {:?}",
+                                            e
+                                        )
+                                    });
+                                }
+                                Ok(None) => {
+                                    println!(
+                                        "Token refresh succeeded but no token is stored. Please re-authenticate."
+                                    );
+                                    oauth::to_oauth_on_browser();
+                                }
+                                Err(e) => {
+                                    println!(
+                                        "Failed to load refreshed token from repository: {:?}",
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                        None => {
+                            println!(
+                                "Refresh token is missing. Opening browser for re-authentication."
+                            );
+                            oauth::to_oauth_on_browser();
+                        }
+                    }
                 }
                 Some(oauth_token) => {
                     sync_events(oauth_token).await.unwrap_or_else(|e| {
@@ -296,11 +327,17 @@ pub async fn handle_google_calendar_event_result(
     match google_calendar_result {
         Ok(google_calendar_parent) => Ok(google_calendar_parent),
         Err(google_calendar::Error::Unauthorized) => {
-            refresh_and_save_token(
-                oauth_token.id.clone(),
-                oauth_token.refresh_token.clone().unwrap(),
-            )
-            .await;
+            match oauth_token.refresh_token.clone() {
+                Some(refresh_token) => {
+                    refresh_and_save_token(oauth_token.id.clone(), refresh_token).await;
+                }
+                None => {
+                    println!(
+                        "Refresh token is missing when handling unauthorized response. Opening browser for re-authentication."
+                    );
+                    oauth::to_oauth_on_browser();
+                }
+            }
             Err(Error::Unauthorized)
         }
         Err(e) => {
@@ -343,34 +380,51 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
 
     // すでに存在するイベントは、events を更新する
     for event in &duplicated_events {
-        let event_update: EventUpdate = google_calendar_parent
+        if let Some(google_event) = google_calendar_parent
             .items
             .iter()
             .find(|e| e.id == event.id)
-            .map(|e| EventUpdate {
-                summary: Some(e.summary.clone()),
-                description: e.description.clone(),
+        {
+            let Some(start_datetime) = resolve_event_datetime(&google_event.start) else {
+                println!(
+                    "Skip updating event {} because start datetime is missing",
+                    google_event.id
+                );
+                continue;
+            };
+            let Some(end_datetime) = resolve_event_datetime(&google_event.end) else {
+                println!(
+                    "Skip updating event {} because end datetime is missing",
+                    google_event.id
+                );
+                continue;
+            };
+
+            let event_update = EventUpdate {
+                summary: Some(google_event.summary.clone()),
+                description: google_event.description.clone(),
                 status: Some(
-                    e.status
+                    google_event
+                        .status
                         .as_ref()
                         .unwrap_or(&EventStatus::Unknown)
                         .to_string(),
                 ),
-                hangout_link: e.hangout_link.clone(),
-                zoom_link: match e.description {
-                    Some(ref description) => extract_zoom_link(description),
-                    None => None,
-                },
-                teams_link: match e.description {
-                    Some(ref description) => extract_teams_link(description),
-                    None => None,
-                },
-                start_datetime: Some(e.start.date_time.clone().unwrap()),
-                end_datetime: Some(e.end.date_time.clone().unwrap()),
+                hangout_link: google_event.hangout_link.clone(),
+                zoom_link: google_event
+                    .description
+                    .as_ref()
+                    .and_then(|description| extract_zoom_link(description)),
+                teams_link: google_event
+                    .description
+                    .as_ref()
+                    .and_then(|description| extract_teams_link(description)),
+                start_datetime: Some(start_datetime),
+                end_datetime: Some(end_datetime),
                 ..Default::default()
-            })
-            .expect("EventUpdate must be created");
-        let _ = repository::event::update(event.id.clone(), event_update);
+            };
+            let _ = repository::event::update(event.id.clone(), event_update);
+        }
     }
 
     // 新規イベントは、events を作成する
@@ -382,38 +436,47 @@ pub fn update_events(google_calendar_parent: GoogleCalendarParent) -> Result<(),
 
     let event_creates: Vec<Event> = new_google_calendar_events
         .clone()
-        .map(|event| Event {
-            id: event.id.clone(),
-            summary: Some(event.summary.clone()),
-            description: event.description.clone(),
-            status: Some(
-                event
-                    .status
+        .filter_map(|event| {
+            let Some(start_datetime) = resolve_event_datetime(&event.start) else {
+                println!(
+                    "Skip creating event {} because start datetime is missing",
+                    event.id
+                );
+                return None;
+            };
+            let Some(end_datetime) = resolve_event_datetime(&event.end) else {
+                println!(
+                    "Skip creating event {} because end datetime is missing",
+                    event.id
+                );
+                return None;
+            };
+
+            Some(Event {
+                id: event.id.clone(),
+                summary: Some(event.summary.clone()),
+                description: event.description.clone(),
+                status: Some(
+                    event
+                        .status
+                        .as_ref()
+                        .unwrap_or(&EventStatus::Unknown)
+                        .to_string(),
+                ),
+                hangout_link: event.hangout_link.clone(),
+                zoom_link: event
+                    .description
                     .as_ref()
-                    .unwrap_or(&EventStatus::Unknown)
-                    .to_string(),
-            ),
-            hangout_link: event.hangout_link.clone(),
-            zoom_link: match event.description {
-                Some(ref description) => extract_zoom_link(description),
-                None => None,
-            },
-            teams_link: match event.description {
-                Some(ref description) => extract_teams_link(description),
-                None => None,
-            },
-            start_datetime: event
-                .start
-                .date_time
-                .clone()
-                .expect("start_datetime must exist"),
-            end_datetime: event
-                .end
-                .date_time
-                .clone()
-                .expect("end_datetime must exist"),
-            notification_enabled: true,
-            notification_sec_from_start: 60 * 10,
+                    .and_then(|description| extract_zoom_link(description)),
+                teams_link: event
+                    .description
+                    .as_ref()
+                    .and_then(|description| extract_teams_link(description)),
+                start_datetime,
+                end_datetime,
+                notification_enabled: true,
+                notification_sec_from_start: 60 * 10,
+            })
         })
         .collect();
     let event_result = repository::event::create_many(event_creates);
