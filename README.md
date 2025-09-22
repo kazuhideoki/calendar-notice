@@ -9,7 +9,9 @@ Google Calendar の予定を取得し、通知を行うプログラムです。
 ### 1. GCP で OAUTH2 クライアント ID を取得
 
 1. https://console.cloud.google.com/apis/credentials で作成
-  - 承認済みのリダイレクト URI を `http://localhost:8990/auth`(デフォルトであれば)に設定
+
+- 承認済みのリダイレクト URI を `http://localhost:8990/auth`(デフォルトであれば)に設定
+
 2. 作成したクライアント ID を `oauth_secret.json` に保存
 
 ### 2. 環境変数の準備
@@ -18,8 +20,25 @@ Google Calendar の予定を取得し、通知を行うプログラムです。
 cp .env.sample .env
 ```
 
+### 3. データベースの初期化
+
+```
+cargo install diesel_cli
+diesel setup
+```
+
 ### 3. 起動
 
 ```
 cargo run
 ```
+
+TUI を表示せずデーモンとして起動する場合は以下のようにします。
+
+```
+cargo run -- --daemon
+```
+
+`--daemon` オプションはバックグラウンド実行向けで、Ctrl+C で終了できます。
+
+`docs/systemd/calendar-notice.service` に `systemd` 用のサービス例を用意しています。

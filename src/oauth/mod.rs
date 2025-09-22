@@ -3,6 +3,8 @@ mod oauth_secret;
 
 use rand::{distributions::Alphanumeric, Rng};
 use std::{collections::HashMap, thread, time::Duration};
+use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 use warp::Filter;
 
 use serde::{Deserialize, Serialize};
@@ -59,16 +61,21 @@ pub fn to_oauth_on_browser() {
     open::that(oauth_url).expect("Failed to open URL in browser");
 }
 
-pub fn spawn_redirect_server() {
-    tokio::spawn(async {
+pub fn spawn_redirect_server(mut shutdown_rx: Receiver<bool>) -> JoinHandle<()> {
+    tokio::spawn(async move {
         let port = Env::new().port;
         let routes = warp::path(AUTH_REDIRECT_PATH)
             .and(warp::query::<std::collections::HashMap<String, String>>())
             .and_then(handle_oauth_redirect);
 
         // println!("HTTP server starting at {}", port.clone());
-        warp::serve(routes).run(([127, 0, 0, 1], port)).await;
-    });
+        let (_, server) =
+            warp::serve(routes).bind_with_graceful_shutdown(([127, 0, 0, 1], port), async move {
+                let _ = shutdown_rx.changed().await;
+            });
+
+        server.await;
+    })
 }
 
 async fn handle_oauth_redirect(

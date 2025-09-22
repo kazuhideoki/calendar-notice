@@ -1,4 +1,5 @@
 use chrono::Timelike;
+use tokio::sync::watch::Sender;
 use ui::UI;
 
 use crate::{
@@ -11,8 +12,7 @@ use crate::{
 
 mod ui;
 
-pub fn show_tui() {
-    let env = Env::new();
+pub fn show_tui(shutdown_tx: Sender<bool>) {
     let mut terminal = ratatui::init();
     let selected_day: u32 = 1;
     let events = fetch_today_events(selected_day);
@@ -24,6 +24,9 @@ pub fn show_tui() {
     };
 
     let _ = ui.run(&mut terminal, fetch_today_events);
+
+    // TUI終了時にシャットダウンシグナルを送信
+    let _ = shutdown_tx.send(true);
 
     ratatui::restore();
 }
