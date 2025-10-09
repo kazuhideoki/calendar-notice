@@ -14,6 +14,7 @@ mod ui;
 
 pub fn show_tui(shutdown_tx: Sender<bool>) {
     let mut terminal = ratatui::init();
+    let env = Env::new();
     let selected_day: u32 = 1;
     let events = fetch_today_events(selected_day);
     let mut ui = UI {
@@ -31,7 +32,9 @@ pub fn show_tui(shutdown_tx: Sender<bool>) {
     ratatui::restore();
 }
 
-fn fetch_today_events(event_period: u32) -> Vec<models::Event> {
+fn fetch_today_events(_selected_day: u32) -> Vec<models::Event> {
+    let env = Env::new();
+    let event_period = env.event_period;
     let start_day = chrono::Local::now()
         .with_hour(0)
         .unwrap()

@@ -1,5 +1,5 @@
-use std::fmt;
 use std::time::Duration;
+use std::{collections::HashMap, fmt};
 use tokio::sync::watch::Receiver;
 use tokio::task::JoinHandle;
 
@@ -268,7 +268,7 @@ pub fn spawn_sync_calendar_cron(mut shutdown_rx: Receiver<bool>) -> JoinHandle<(
                                     println!(
                                         "Token refresh succeeded but no token is stored. Please re-authenticate."
                                     );
-                                    oauth::to_oauth_on_browser();
+                                    to_oauth_on_browser();
                                 }
                                 Err(e) => {
                                     println!(
@@ -282,7 +282,7 @@ pub fn spawn_sync_calendar_cron(mut shutdown_rx: Receiver<bool>) -> JoinHandle<(
                             println!(
                                 "Refresh token is missing. Opening browser for re-authentication."
                             );
-                            oauth::to_oauth_on_browser();
+                            to_oauth_on_browser();
                         }
                     }
                 }
@@ -344,7 +344,7 @@ pub async fn handle_google_calendar_event_result(
                     println!(
                         "Refresh token is missing when handling unauthorized response. Opening browser for re-authentication."
                     );
-                    oauth::to_oauth_on_browser();
+                    to_oauth_on_browser();
                 }
             }
             Err(Error::Unauthorized)
@@ -386,95 +386,81 @@ pub fn update_events(
         vec![]
     });
 
-<<<<<<< HEAD
-    let mut existing_events: Vec<&GoogleCalendarEvent> = vec![];
-    let mut deleting_events: Vec<&Event> = vec![];
-    let mut adding_events: Vec<&GoogleCalendarEvent> = vec![];
+    let google_events_map: HashMap<&str, &GoogleCalendarEvent> = google_calendar_parent
+        .items
+        .iter()
+        .map(|event| (event.id.as_str(), event))
+        .collect();
+    let event_map: HashMap<&str, &Event> = events
+        .iter()
+        .map(|event| (event.id.as_str(), event))
+        .collect();
+
+    let mut updating_events: Vec<(&Event, &GoogleCalendarEvent)> = Vec::new();
+    let mut deleting_events: Vec<&Event> = Vec::new();
+
     for event in &events {
-        let existing_event = google_calendar_parent
-            .items
-            .iter()
-            .find(|e| e.id == event.id);
-        if let Some(google_calendar_event) = existing_event {
-            existing_events.push(google_calendar_event);
-        }
-
-        if existing_event.is_none() {
-            deleting_events.push(event);
-        }
-    }
-    for google_calendar_event in &google_calendar_parent.items {
-        let existing_event = events.iter().find(|e| e.id == google_calendar_event.id);
-        if existing_event.is_none() {
-            adding_events.push(google_calendar_event);
-=======
-    // すでに存在するイベントは、events を更新する
-    for event in &duplicated_events {
-        if let Some(google_event) = google_calendar_parent
-            .items
-            .iter()
-            .find(|e| e.id == event.id)
-        {
-            let Some(start_datetime) = resolve_event_datetime(&google_event.start) else {
-                println!(
-                    "Skip updating event {} because start datetime is missing",
-                    google_event.id
-                );
-                continue;
-            };
-            let Some(end_datetime) = resolve_event_datetime(&google_event.end) else {
-                println!(
-                    "Skip updating event {} because end datetime is missing",
-                    google_event.id
-                );
-                continue;
-            };
-
-            let event_update = EventUpdate {
-                summary: Some(google_event.summary.clone()),
-                description: google_event.description.clone(),
-                status: Some(
-                    google_event
-                        .status
-                        .as_ref()
-                        .unwrap_or(&EventStatus::Unknown)
-                        .to_string(),
-                ),
-                hangout_link: google_event.hangout_link.clone(),
-                zoom_link: google_event
-                    .description
-                    .as_ref()
-                    .and_then(|description| extract_zoom_link(description)),
-                teams_link: google_event
-                    .description
-                    .as_ref()
-                    .and_then(|description| extract_teams_link(description)),
-                start_datetime: Some(start_datetime),
-                end_datetime: Some(end_datetime),
-                ..Default::default()
-            };
-            let _ = repository::event::update(event.id.clone(), event_update);
->>>>>>> master
+        match google_events_map.get(event.id.as_str()) {
+            Some(google_event) => updating_events.push((event, *google_event)),
+            None => deleting_events.push(event),
         }
     }
 
-    // 更新
-    for event in existing_events {
-        let event_update: EventUpdate = EventUpdate::from(event);
+    let mut adding_events: Vec<&GoogleCalendarEvent> = Vec::new();
+    for google_event in &google_calendar_parent.items {
+        if !event_map.contains_key(google_event.id.as_str()) {
+            adding_events.push(google_event);
+        }
+    }
+
+    for (event, google_event) in updating_events {
+        let Some(start_datetime) = resolve_event_datetime(&google_event.start) else {
+            println!(
+                "Skip updating event {} because start datetime is missing",
+                google_event.id
+            );
+            continue;
+        };
+        let Some(end_datetime) = resolve_event_datetime(&google_event.end) else {
+            println!(
+                "Skip updating event {} because end datetime is missing",
+                google_event.id
+            );
+            continue;
+        };
+
+        let event_update = EventUpdate {
+            summary: Some(google_event.summary.clone()),
+            description: google_event.description.clone(),
+            status: Some(
+                google_event
+                    .status
+                    .as_ref()
+                    .unwrap_or(&EventStatus::Unknown)
+                    .to_string(),
+            ),
+            hangout_link: google_event.hangout_link.clone(),
+            zoom_link: google_event
+                .description
+                .as_ref()
+                .and_then(|description| extract_zoom_link(description)),
+            teams_link: google_event
+                .description
+                .as_ref()
+                .and_then(|description| extract_teams_link(description)),
+            start_datetime: Some(start_datetime),
+            end_datetime: Some(end_datetime),
+            ..Default::default()
+        };
         let _ = repository::event::update(event.id.clone(), event_update);
     }
-    // 削除
+
     for event in deleting_events {
         let _ = repository::event::delete(event.id.clone());
     }
-    // 作成
-    let event_result =
-        repository::event::create_many(adding_events.iter().map(|e| Event::from(*e)).collect());
 
-<<<<<<< HEAD
-=======
-    let event_creates: Vec<Event> = new_google_calendar_events
-        .clone()
+    let event_creates: Vec<Event> = adding_events
+        .iter()
         .filter_map(|event| {
             let Some(start_datetime) = resolve_event_datetime(&event.start) else {
                 println!(
@@ -518,10 +504,11 @@ pub fn update_events(
             })
         })
         .collect();
-    let event_result = repository::event::create_many(event_creates);
->>>>>>> master
-    if let Err(e) = event_result {
-        return Err(format!("Failed to create events: {:?}", e).to_string());
+
+    if !event_creates.is_empty() {
+        if let Err(e) = repository::event::create_many(event_creates) {
+            return Err(format!("Failed to create events: {:?}", e));
+        }
     }
 
     Ok(())
